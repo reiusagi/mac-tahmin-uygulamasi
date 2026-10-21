@@ -56,7 +56,8 @@ def kur(G):
             for r in S.reyting:
                 on = r['i'] in secili
                 ui.button(r['name'], on_click=lambda _, i=r['i']: degistir(i)).props(
-                    f'dense no-caps unelevated size=sm {"color=primary" if on else "outline color=grey-8"}').classes('text-xs')
+                    f'dense no-caps unelevated {"color=primary" if on else "outline color=grey-8"}').classes(
+                    'text-sm').style('padding:3px 10px')
 
     def degistir(i):
         if i in secili:
