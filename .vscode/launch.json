@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Uygulama (pencere)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mac_tahmin",
+      "args": ["uygulama"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Uygulama (tarayıcı)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mac_tahmin",
+      "args": ["sunucu"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Canlı skorlar",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mac_tahmin",
+      "args": ["canli"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Maç tahmini (örnek)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mac_tahmin",
+      "args": ["tahmin", "Super_Lig", "2026", "Galatasaray", "Fenerbahçe"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

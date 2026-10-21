@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# PyInstaller çıktıları (masaustu_paketle.py yeniden üretir)
+build/
+dist/
+*.spec
+
+# indirilen ham yanıtların önbelleği (~1 GB, kendini yeniden doldurur); dogum.json elle doldurulur, saklanır
+ham/*
+!ham/dogum.json
+
+# NiceGUI'nin yerel durumu (son seçimler, favoriler, tahmin oyunu kayıtları)
+.nicegui/
+
+# testler
+.pytest_cache/
+.coverage
+htmlcov/
+
+# günlükler
+*.log

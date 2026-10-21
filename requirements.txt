@@ -1,0 +1,7 @@
+# uygulama
+nicegui~=3.17.1
+numpy~=2.5.3
+pywebview~=6.2.1    # "uygulama" komutu ve masaüstü sürümü: kendi penceresi
+# yalnızca masaüstü paketi üretmek için
+pyinstaller~=6.22.3
+pillow~=12.3.0
