@@ -206,7 +206,9 @@ async def kadro_topla(depo, S, h, a, ilk11):
         tid = depo.takim_kimligi(S.lig, S.T[i])
         if tid is not None:
             try:
-                sayfalar[i] = await run.io_bound(takim_veri.takim_sayfasi, tid, depo.g.ham)
+                sayfa = await run.io_bound(takim_veri.takim_sayfasi, tid, depo.g.ham)
+                if sayfa:  # ağ yokken None döner: sezon verisine düşülür
+                    sayfalar[i] = sayfa
             except Exception:
                 logger.debug('takım sayfası alınamadı: %s', tid, exc_info=True)
         if ilk11:
