@@ -80,13 +80,32 @@ def tahmine_git(G, m):
             G.sekme_ac('milli' if milli_mi else 'avrupa')
             ui.notify('Ayrıntılı tahmin için bu sekmede maça tıkla.')
         return True
-    ters = {str(v): ad for ad, v in (G.depo.stadyumlar()['ligler'].get(lig) or {}).items()}
-    ev, dep = ters.get(str(m.get('evId'))), ters.get(str(m.get('depId')))
-    if not ev or not dep:
+    bulunan = _lig_takimlari(G.depo.stadyumlar()['ligler'], lig, m.get('evId'), m.get('depId'))
+    if not bulunan:
         ui.notify('Bu maçın takımları uygulamanın liglerinde bulunamadı.')
         return False
-    G.tahmin_ac(lig, ev, dep)
+    G.tahmin_ac(*bulunan)
     return True
+
+
+def _lig_takimlari(ligler, lig, ev_id, dep_id):
+    """(lig, ev adı, deplasman adı): önce verilen lig, yoksa iki takımı birlikte içeren lig (Takımlarım ve takım
+    sayfasından açılan maç kartında lig bilinmez); bulunamazsa None."""
+    for anahtar in ([lig] if lig in ligler else []) + [k for k in ligler if k != lig]:
+        ters = {str(v): ad for ad, v in ligler[anahtar].items()}
+        ev, dep = ters.get(str(ev_id)), ters.get(str(dep_id))
+        if ev and dep:
+            return anahtar, ev, dep
+    return None
+
+
+def mac_kimlikleri_tamamla(m, veri):
+    """Maç kartının maç sözlüğü, eksik takım kimlikleri kartın yüklediği ayrıntıdan (mac_ozeti.ayrinti) tamamlanmış
+    kopya; özgün sözlük değişmez."""
+    if not veri:
+        return m
+    return {**m, 'evId': m.get('evId') or (veri.get('ev') or {}).get('id'),
+            'depId': m.get('depId') or (veri.get('dep') or {}).get('id')}
 
 
 # renk paletleri: anahtar -> (ad, örnek renk); CSS'te body.palet-<anahtar> (açık ve koyu tema ayrı). 'saha' varsayılan.

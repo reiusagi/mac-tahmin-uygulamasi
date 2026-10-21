@@ -40,6 +40,46 @@ def test_kimliksiz_kupa_maci_sekmeye_gecer(monkeypatch):
     gorunum.avrupa_mac_ac.assert_not_called()
 
 
+def _gorunum_ligler():
+    gorunum = Mock()
+    gorunum.depo.stadyumlar.return_value = {'ligler': {
+        'EPL': {'Arsenal': 9825, 'Chelsea': 8455},
+        'Ligue_1': {'Paris Saint Germain': 9847, 'Lyon': 9748}}}
+    return gorunum
+
+
+def test_ligi_bilinmeyen_mac_takimlarindan_bulunur():
+    """Takımlarım ve takım sayfasından açılan maç kartında lig yok: iki takımı birlikte içeren lig kullanılır."""
+    gorunum = _gorunum_ligler()
+
+    assert tahmine_git(gorunum, {'durum': 'baslamadi', 'evId': 9847, 'depId': 9748}) is True
+
+    gorunum.tahmin_ac.assert_called_once_with('Ligue_1', 'Paris Saint Germain', 'Lyon')
+
+
+def test_farkli_liglerin_takimlari_bulunamaz(monkeypatch):
+    from nicegui import ui
+    monkeypatch.setattr(ui, 'notify', Mock())
+    gorunum = _gorunum_ligler()
+
+    assert tahmine_git(gorunum, {'durum': 'baslamadi', 'evId': 9847, 'depId': 9825}) is False
+
+    gorunum.tahmin_ac.assert_not_called()
+
+
+def test_mac_kimlikleri_karttaki_ayrintidan_tamamlanir():
+    from mac_tahmin.arayuz.ortak import mac_kimlikleri_tamamla
+    mac = {'id': 1, 'durum': 'baslamadi'}
+    veri = {'ev': {'id': 9847, 'ad': 'Paris Saint-Germain'}, 'dep': {'id': 9748, 'ad': 'Lyon'}}
+
+    tam = mac_kimlikleri_tamamla(mac, veri)
+
+    assert (tam['evId'], tam['depId']) == (9847, 9748)
+    assert 'evId' not in mac  # özgün sözlük değişmez
+    assert mac_kimlikleri_tamamla({'evId': 1, 'depId': 2}, veri) == {'evId': 1, 'depId': 2}
+    assert mac_kimlikleri_tamamla(mac, None) == mac
+
+
 @pytest.mark.parametrize('m, beklenen', [({'durum': 'canli', 'lig': 'Super_Lig'}, False),
                                          ({'durum': 'canli', 'lig': 'avrupa-42'}, True),
                                          ({'durum': 'canli', 'lig': 'milli-84'}, True),

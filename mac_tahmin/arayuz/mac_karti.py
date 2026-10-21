@@ -10,7 +10,8 @@ from .. import hava
 from ..logo import logo_html, takim_logo_url
 from ..mac_ozeti import ayrinti
 from ..ulkeler import turkce
-from .ortak import e, hata_metni, hava_html, kisa_gun, tahmin_acilabilir, tahmine_git, takim_tiklama, yerel
+from .ortak import (e, hata_metni, hava_html, kisa_gun, mac_kimlikleri_tamamla, tahmin_acilabilir, tahmine_git,
+                    takim_tiklama, yerel)
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +312,7 @@ class _MacKarti:
             self.hava_yer.content = ''
 
     def tahmine(self):
-        m = self.d['mac']
+        m = self.d['mac'] and mac_kimlikleri_tamamla(self.d['mac'], self.d['veri'])
         if m and tahmine_git(self.G, m):
             self.kart.close()
 
