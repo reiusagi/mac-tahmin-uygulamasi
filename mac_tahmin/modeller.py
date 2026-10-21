@@ -60,12 +60,14 @@ def _dixon_coles(i, j, lh, la, rho):
 
 
 MAKS_TABLO = 100  # skor tablosunun en büyük kenarı (pmf'teki faktöriyel taşmasın)
+MAKS_BEKLENEN = 15  # beklenen gol bundan büyükse kırpılır: daha büyüğünde bütün hücreler sıfıra iner (sıfıra bölme)
 
 
 def sonuc_olasiliklari(lh, la, rho=0.0):
     """Beklenen gollerden [ev, beraberlik, deplasman] olasılıkları ve skor tablosu (en az 10x10; beklenen goller büyükse
     tablo genişler, yoksa kuyruk kesilir). rho: Dixon-Coles düzeltmesi (0: düz Poisson). Tablo ve 1X2 aynı toplama
     bölünür, yani tablo toplamı her zaman 1'dir ve bölgelerin toplamı 1X2'ye eşittir."""
+    lh, la = min(lh, MAKS_BEKLENEN), min(la, MAKS_BEKLENEN)
     b = max(lh, la)
     n = min(MAKS_TABLO, max(10, math.ceil(b + 6 * math.sqrt(b) + 1)))
     pi = [pmf(i, lh) for i in range(n)]
@@ -95,11 +97,13 @@ IY_PAY = 0.47
 def ilk_yari(lh, la):
     """İlk yarı tahmini, maçın beklenen gollerinin IY_PAY kadarıyla (Poisson): {'p': [ev önde, berabere, dep önde],
     'ust05', 'ust15' (ilk yarıda en az 1 / 2 gol), 'lh', 'la'}."""
-    l1, l2 = lh * IY_PAY, la * IY_PAY
+    l1, l2 = min(lh, MAKS_BEKLENEN) * IY_PAY, min(la, MAKS_BEKLENEN) * IY_PAY
+    b = max(l1, l2)
+    n = min(MAKS_TABLO, max(8, math.ceil(b + 6 * math.sqrt(b) + 1)))  # olağan beklentide 8x8; büyükse kuyruk kesilmesin
     p = [0.0, 0.0, 0.0]
     ust05 = ust15 = 0.0
-    for i in range(8):
-        for j in range(8):
+    for i in range(n):
+        for j in range(n):
             q = pmf(i, l1) * pmf(j, l2)
             p[0 if i > j else 1 if i == j else 2] += q
             ust05 += q if i + j >= 1 else 0
@@ -135,6 +139,7 @@ def _fark_dagilimi(lh, la):
 
 
 MAC_SURESI = 94  # uzatmalarla bir maçın ortalama süresi (dakika); canlı olasılıkta kalan süre buna göre
+KALAN_EN_AZ = 1  # süren maçta (90+5' gibi uzatma dakikalarında da) en az bu kadar dakika kalmış sayılır
 
 
 DUZELTME_TABAN = 1e-3  # düzeltme oranında sıfıra bölmeyi ve bir sonucu tamamen sıfırlamayı önler
@@ -155,16 +160,15 @@ def dakika_oku(yazi):
 def canli_olasilik(lh, la, ev_gol, dep_gol, dakika, once=None):
     """Maç sürerken sonuç olasılıkları [ev, beraberlik, deplasman]: maç öncesi beklenen gollerin (uzatmalar dahil bütün
     maç için lh, la) kalan süreye düşen kısmı Poisson'la oynatılır, şu anki skora eklenir. Kırmızı kart, oyun akışı
-    hesaba katılmaz. Süre dolunca (MAC_SURESI) sonuç skora göre kesindir.
+    hesaba katılmaz. Yalnızca süren maç için çağrılır: MAC_SURESI geçse de (uzatmalar) en az KALAN_EN_AZ dakika kalmış
+    sayılır, sonuç neredeyse kesin olur ama maç bitmeden %100'e çıkmaz.
     once: maç öncesi harmanlı tahmin (Poisson + Dixon-Coles + Elo, Sezon.olasilik). Verilirse onun düz Poisson'dan farkı
     (Elo ve Dixon-Coles'in katkısı) oran olarak, kalan süre üssüyle çarpılır ve yeniden ölçeklenir: dakika 0'da 0-0
     sonuç tam olarak once olur, maç ilerledikçe düzeltme söner. Çarpımsal olduğundan skor durumunu bozmaz (0-3 geride
     olan favorinin şansı şişmez, beraberlik sıfırlanmaz). Dixon-Coles'i kalan süre dağılımına ayrıca uygulamak
     düzeltmeyi iki kez saymak olurdu; etkisi bu farkın içinde zaten var."""
-    kalan = max(0.0, MAC_SURESI - dakika) / MAC_SURESI
+    kalan = max(KALAN_EN_AZ, MAC_SURESI - dakika) / MAC_SURESI
     fark = ev_gol - dep_gol
-    if kalan <= 0:
-        return [1.0, 0.0, 0.0] if fark > 0 else [0.0, 1.0, 0.0] if fark == 0 else [0.0, 0.0, 1.0]
     p = [0.0, 0.0, 0.0]
     for k, v in _fark_dagilimi(max(lh * kalan, 1e-6), max(la * kalan, 1e-6)).items():
         son = fark + k

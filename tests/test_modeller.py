@@ -173,11 +173,31 @@ def test_canli_olasilik_toplam_bir():
 
 
 @pytest.mark.parametrize('ev,dep,yon', [(2, 1, 0), (1, 1, 1), (0, 3, 2), (0, 0, 1)])
-def test_canli_olasilik_sure_dolunca_sonuc_kesin(ev, dep, yon):
-    for dk in (MAC_SURESI, MAC_SURESI + 4, 130):
-        p = canli_olasilik(1.5, 1.1, ev, dep, dk)
-        assert p[yon] > 0.999999
-        assert canli_olasilik(1.5, 1.1, ev, dep, dk, once=[0.4, 0.3, 0.3])[yon] > 0.999999
+def test_canli_olasilik_uzatmada_neredeyse_kesin_ama_bitmemis(ev, dep, yon):
+    """Fonksiyon yalnızca süren maç için çağrılır: 94. dakikadan sonra (90+5') maç bitmemiştir, en az bir dakika kalır."""
+    for dk in (MAC_SURESI, MAC_SURESI + 1, MAC_SURESI + 4, 130):
+        for once in (None, [0.4, 0.3, 0.3]):
+            p = canli_olasilik(1.5, 1.1, ev, dep, dk, once=once)
+            assert 0.95 < p[yon] < 1.0
+            assert sum(p) == pytest.approx(1.0)
+
+
+def test_canli_olasilik_uzatma_dakikasi_ilerledikce_kesinlesir():
+    assert canli_olasilik(1.5, 1.1, 0, 0, 80)[1] < canli_olasilik(1.5, 1.1, 0, 0, 92)[1] < canli_olasilik(1.5, 1.1, 0, 0, 95)[1]
+
+
+@pytest.mark.parametrize('lam', [16, 40, 1000, 1e6])
+def test_asiri_beklenen_golde_gecerli_dagilim(lam):
+    p, hucreler = sonuc_olasiliklari(lam, lam)
+    assert sum(p) == pytest.approx(1.0) and sum(h[2] for h in hucreler) == pytest.approx(1.0)
+    assert p[0] == pytest.approx(p[2])
+    iy = ilk_yari(lam, lam)
+    assert sum(iy['p']) == pytest.approx(1.0) and 0 <= iy['ust15'] <= iy['ust05'] <= 1
+
+
+def test_ilk_yari_yuksek_beklentide_kuyruk_kesilmez():
+    """Tablo beklentiye göre genişler: ilk yarıda 5,6 gol beklentisinde 2+ gol olasılığı neredeyse 1."""
+    assert ilk_yari(12, 12)['ust15'] > 0.999
 
 
 def test_canli_olasilik_mac_basi_duz_poisson_ile_ayni():
