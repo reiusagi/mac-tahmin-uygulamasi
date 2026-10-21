@@ -194,7 +194,7 @@ def kur(G):
         if G.S is not S or not sonuc:
             return
         gol, asist = sonuc
-        krallik_kutu.content = ('<div class="krallik">' + _krallik_tablosu(G.depo, S, 'Gol krallığı', gol)
+        krallik_kutu.content = ('<div class="krallik genis">' + _krallik_tablosu(G.depo, S, 'Gol krallığı', gol)
                                 + _krallik_tablosu(G.depo, S, 'Asist krallığı', asist) + '</div>')
         krallik_not.text = _krallik_notu(S)
 

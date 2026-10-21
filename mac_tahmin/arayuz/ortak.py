@@ -466,7 +466,9 @@ table.kariyer-tablo tr.kr-kulvar td:nth-child(2){padding-left:28px}
 .lider-kutu{background:var(--panel-2);border-radius:8px;padding:8px 10px}
 .lider{display:grid;grid-template-columns:18px minmax(0,1fr) auto auto;gap:6px;align-items:baseline;padding:3px 0;font-size:.9rem}
 .lider .sira{color:var(--soft);font-size:.8rem} .lider .ad{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.krallik{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}
+.krallik{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:16px 20px}
+.krallik.genis{grid-template-columns:repeat(auto-fit,minmax(min(100%,620px),1fr))}  /* 6 sütunlu krallık tabloları */
+.krallik>div{min-width:0;overflow-x:auto}  /* geniş tablo komşu listenin üstüne taşmasın, kendi içinde kaysın */
 table.krallik-tablo td .logo{width:18px;height:18px;vertical-align:-4px;margin-right:5px}
 .oy.tiklanir{cursor:pointer} .oy.tiklanir:hover .isim{text-decoration:underline}
 .mk-takim{cursor:pointer}
