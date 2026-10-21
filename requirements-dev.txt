@@ -1,0 +1,4 @@
+# testler için (uygulamanın kendisi requirements.txt ile kurulur)
+-r requirements.txt
+pytest>=8.0
+pytest-cov>=5.0
