@@ -1,6 +1,9 @@
 """Tahmin karnesi: modelin maç sonuçlarını ne kadar iyi bildiği. Her ligin süren ve geçen sezonundaki her hafta, yalnızca
 o haftadan önce oynanmış maçlarla (ve önceki sezonlarla) kurulan modelle tahmin edilir ve gerçek sonuçla karşılaştırılır:
 maç günü yapılmış tahminin aynısı, sonradan öğrenilen hiçbir şey kullanılmaz (sezon toplamı xG gibi bilgiler de çıkarılır).
+Tahmin, uygulamadaki maç tahminiyle aynı işlevdir (Sezon.tahmin: Poisson + Dixon-Coles + Elo harmanı); yalnızca kadro
+değeri eğimi (Sezon.deger_ata) kullanılmaz: elde sezon sezon geçmiş değer yok, yalnızca bugünkü değerler var ve bunları
+geçmiş maçlarda kullanmak sızıntı olur (denendi: 2026'da log-kayıp 1,0005 → 0,9965, ama bugünkü değerlerle).
 Sonuçlar cikti/karne.json'da birikir; her güncellemede yalnızca yeni haftalar hesaplanır."""
 import json
 import logging
@@ -149,13 +152,38 @@ def gol_ozeti(kayitlar):
     return out
 
 
+KALIBRASYON_DILIM = 10  # kalibrasyon tablosunda olasılık dilimi sayısı (0–10 %, 10–20 %, …)
+
+
+def kalibrasyon_tablosu(kayitlar, dilim=KALIBRASYON_DILIM):
+    """Güvenilirlik tablosu: her maçın üç olasılığı (ev, beraberlik, deplasman) dilimlere ayrılır. Döner (boş dilimler
+    atlanır, küçükten büyüğe): [{'alt', 'ust', 'n', 'tahmin' (dilimdeki ortalama olasılık), 'oran' (gerçekleşme)}]."""
+    kal = {}
+    for r in kayitlar:
+        sonuc = 0 if r[8] > r[9] else 1 if r[8] == r[9] else 2
+        for k in range(3):
+            b = kal.setdefault(min(dilim - 1, int(r[5 + k] * dilim + 1e-9)), [0, 0.0, 0])
+            b[0] += 1
+            b[1] += r[5 + k]
+            b[2] += k == sonuc
+    return [{'alt': i / dilim, 'ust': (i + 1) / dilim, 'n': b[0], 'tahmin': b[1] / b[0], 'oran': b[2] / b[0]}
+            for i, b in sorted(kal.items())]
+
+
+def kalibrasyon_hatasi(tablo):
+    """Beklenen kalibrasyon hatası (ECE): dilimlerde söylenen ile gerçekleşen arasındaki farkın olasılık sayısıyla
+    ağırlıklı ortalaması (0–1; küçük olan iyi). Boş tabloda None."""
+    n = sum(d['n'] for d in tablo)
+    return sum(abs(d['tahmin'] - d['oran']) * d['n'] for d in tablo) / n if n else None
+
+
 def ozet(kayitlar):
-    """İsabet (en olası sonucun gerçekleşme oranı), log-kayıp, Brier puanı, karşılaştırma ölçütleri ve kalibrasyon."""
+    """İsabet (en olası sonucun gerçekleşme oranı), log-kayıp, Brier puanı, karşılaştırma ölçütleri ve kalibrasyon
+    ('kalibrasyon': en az 20 olasılıklı dilimler (grafik), 'kalibrasyon_tablosu' ve 'ece': bütün dilimler)."""
     n = len(kayitlar)
     if not n:
         return None
     isabet = logk = brier = ev_isabet = 0.0
-    kal = [[0, 0.0, 0] for _ in range(10)]  # [tahmin sayısı, tahmin toplamı, gerçekleşen]
     for r in kayitlar:
         p = r[5:8]
         sonuc = 0 if r[8] > r[9] else 1 if r[8] == r[9] else 2
@@ -163,14 +191,10 @@ def ozet(kayitlar):
         ev_isabet += sonuc == 0
         logk -= math.log(max(1e-9, p[sonuc]))
         brier += sum((p[k] - (k == sonuc)) ** 2 for k in range(3))
-        for k in range(3):
-            b = min(9, int(p[k] * 10))
-            kal[b][0] += 1
-            kal[b][1] += p[k]
-            kal[b][2] += k == sonuc
     # kıyas: hep aynı olasılıkları veren "bilgisiz" tahmin (ev, beraberlik, deplasman oranları)
     oran = [sum(1 for r in kayitlar if (r[8] > r[9], r[8] == r[9], r[8] < r[9])[k]) / n for k in range(3)]
     bilgisiz = -sum(oran[k] * math.log(max(1e-9, oran[k])) for k in range(3))
+    tablo = kalibrasyon_tablosu(kayitlar)
     return {'n': n, 'isabet': isabet / n, 'log_kayip': logk / n, 'brier': brier / n, 'ev_isabet': ev_isabet / n,
-            'bilgisiz_log_kayip': bilgisiz, 'oran': oran,
-            'kalibrasyon': [(k[1] / k[0], k[2] / k[0], k[0]) for k in kal if k[0] >= 20]}
+            'bilgisiz_log_kayip': bilgisiz, 'oran': oran, 'kalibrasyon_tablosu': tablo, 'ece': kalibrasyon_hatasi(tablo),
+            'kalibrasyon': [(d['tahmin'], d['oran'], d['n']) for d in tablo if d['n'] >= 20]}

@@ -66,3 +66,37 @@ def test_oku_ve_onbellek(tmp_path):
     assert karne.oku(tmp_path) == K
     assert karne.oku_onbellek(tmp_path) == K
     assert karne.oku_onbellek(tmp_path) is karne.oku_onbellek(tmp_path)
+
+
+def test_kalibrasyon_tablosu_dilimler():
+    # 4 maç × 3 sonuç = 12 olasılık; 0,6 / 0,7 tek, 0,5 tek dilimde
+    t = karne.kalibrasyon_tablosu(K)
+    assert sum(d['n'] for d in t) == 12
+    assert [d['alt'] for d in t] == sorted(d['alt'] for d in t)
+    d6 = next(d for d in t if d['alt'] == pytest.approx(0.6))
+    assert d6['n'] == 1 and d6['tahmin'] == pytest.approx(0.6) and d6['oran'] == 1.0  # 2-0, ev %60
+    d5 = next(d for d in t if d['alt'] == pytest.approx(0.5))
+    assert d5['n'] == 2 and d5['oran'] == 0.0  # 0,5 ev (0-1) ve 0,5 deplasman (1-1): ikisi de olmadı
+    assert karne.kalibrasyon_tablosu([]) == []
+
+
+def test_kalibrasyon_tablosu_bir_olasiligi_son_dilimde():
+    t = karne.kalibrasyon_tablosu([kayit((1.0, 0.0, 0.0), 1, 0)])
+    assert t[-1]['alt'] == pytest.approx(0.9) and t[-1]['n'] == 1 and t[-1]['oran'] == 1.0
+    assert t[0]['alt'] == 0.0 and t[0]['n'] == 2 and t[0]['oran'] == 0.0
+
+
+def test_kalibrasyon_hatasi():
+    assert karne.kalibrasyon_hatasi([]) is None
+    assert karne.kalibrasyon_hatasi([{'n': 10, 'tahmin': 0.3, 'oran': 0.3}]) == pytest.approx(0.0)
+    # ağırlıklı ortalama |söylenen - olan|: (10·0,1 + 30·0,2) / 40
+    t = [{'n': 10, 'tahmin': 0.3, 'oran': 0.4}, {'n': 30, 'tahmin': 0.7, 'oran': 0.5}]
+    assert karne.kalibrasyon_hatasi(t) == pytest.approx(0.175)
+    # mükemmel tahmin: hata 0
+    assert karne.kalibrasyon_hatasi(karne.kalibrasyon_tablosu([kayit((1.0, 0.0, 0.0), 1, 0)] * 3)) == pytest.approx(0.0)
+
+
+def test_ozet_kalibrasyon_hatasi():
+    o = karne.ozet(K)
+    assert o['ece'] == pytest.approx(karne.kalibrasyon_hatasi(karne.kalibrasyon_tablosu(K)))
+    assert o['kalibrasyon_tablosu'] == karne.kalibrasyon_tablosu(K)

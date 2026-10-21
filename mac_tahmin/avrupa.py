@@ -24,6 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import sema
 from .logo import LIG_LOGO as LOGO, TAKIM_LOGO  # noqa: F401  (eski adlar)
 from .milli import DosyaOnbellegi, MilliElo, _getir, _yil, _yol
 from .modeller import sonuc_olasiliklari
@@ -149,7 +150,7 @@ def indir(ham, cikti, yenile_guncel=False, yaz=None, zorla=()):
                 continue
             sezon = _sezon_adi(lid, y)
             try:
-                onbellekli(yol, fotmob_url('leagues', id=lid, season=sezon))
+                sema.kontrol('kupa', onbellekli(yol, fotmob_url('leagues', id=lid, season=sezon)))
                 indirilen += 1
             except Exception:
                 logger.warning('FotMob sezonu alınamadı: %s', yol.name, exc_info=True)

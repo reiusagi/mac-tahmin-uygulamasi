@@ -1,11 +1,77 @@
-"""Modeller sekmesi: tahmin modellerinin bu sezonun son %30'undaki başarısı, özellik önemleri ve test maçları."""
+"""Modeller sekmesi: tahmin modellerinin bu sezonun son %30'undaki başarısı, özellik önemleri ve test maçları. Eğitim
+saniyeler sürdüğünden sonuç ham/modeller/ altında JSON olarak saklanır: lig dosyaları (bu sezon ve önceki sezonlar) ve
+model kodu değişmedikçe yeniden eğitilmez."""
+import hashlib
+import json
 import logging
+from pathlib import Path
 
 from nicegui import run, ui
 
+from .. import modeller as _modeller
+from .. import sezon as _sezon
+from ..modeller import Mac
+from ..sezon import GECMIS
+from .depo import dosya_adi
 from .ortak import e, fmt, tarih_uzun, yuzde
 
 logger = logging.getLogger(__name__)
+ONBELLEK_KLASOR = 'modeller'  # ham/ altında
+_SURUM = []
+
+
+def model_surumu():
+    """Model kodunun parmak izi (modeller.py ve sezon.py): kod değişince önbellek kendiliğinden geçersiz olur."""
+    if not _SURUM:
+        h = hashlib.sha1()
+        for m in (_modeller, _sezon):
+            h.update(Path(m.__file__).read_bytes())
+        _SURUM.append(h.hexdigest()[:16])
+    return _SURUM[0]
+
+
+def _anahtar(S, veri_klasoru, surum):
+    dosyalar = []
+    for y in range(S.yil - GECMIS, S.yil + 1):
+        yol = Path(veri_klasoru) / f'{S.lig}-{y}.json'
+        st = yol.stat() if yol.exists() else None
+        dosyalar.append([yol.name, st.st_mtime_ns if st else None, st.st_size if st else None])
+    return {'lig': S.lig, 'yil': S.yil, 'dosyalar': dosyalar, 'surum': surum}
+
+
+def _kodla(ev):
+    m = lambda x: [x.d, x.h, x.a, x.hg, x.ag, x.hx, x.ax]  # noqa: E731
+    return {**ev, 'test': [{**t, 'mac': m(t['mac'])} for t in ev['test']]}
+
+
+def _coz(ev):
+    return {**ev, 'test': [{**t, 'mac': Mac(*t['mac'])} for t in ev['test']]}
+
+
+def degerlendir_onbellekli(S, veri_klasoru, ham, surum=None):
+    """S.degerlendir() sonucu, diskteki önbellekten (anahtar: lig, sezon, lig dosyalarının zamanı ve boyu, model
+    sürümü) ya da hesaplanıp önbelleğe yazılarak. Döner: (sonuç ya da az maçta None, önbellekten mi)."""
+    if S.lig is None or S.yil is None:
+        return S.degerlendir(), False
+    anahtar = _anahtar(S, veri_klasoru, surum or model_surumu())
+    yol = Path(ham) / ONBELLEK_KLASOR / f'{dosya_adi(S.lig)}-{dosya_adi(S.yil)}.json'
+    if S._ev is None and yol.exists():
+        try:
+            k = json.loads(yol.read_text(encoding='utf-8'))
+            if k.get('anahtar') == anahtar:
+                return _coz(k['ev']), True
+        except (OSError, ValueError, KeyError, TypeError):
+            logger.debug('model önbelleği okunamadı: %s', yol, exc_info=True)
+    ev = S.degerlendir()
+    if ev is not None:
+        try:
+            yol.parent.mkdir(parents=True, exist_ok=True)
+            gecici = yol.with_suffix('.tmp')
+            gecici.write_text(json.dumps({'anahtar': anahtar, 'ev': _kodla(ev)}, ensure_ascii=False), encoding='utf-8')
+            gecici.replace(yol)
+        except (OSError, TypeError, ValueError):
+            logger.debug('model önbelleği yazılamadı: %s', yol, exc_info=True)
+    return ev, False
 
 ID, AD = 'modeller', 'Modeller'
 TEMBEL = True  # modellerin eğitimi saniyeler sürer: yalnızca sekme açıkken hesaplanır
@@ -55,17 +121,17 @@ def kur(G):
             lead.text = 'Modeller eğitiliyor ve test ediliyor… (birkaç saniye sürebilir)'
             tablo.content = ''
             alt.set_visibility(False)
-            await run.io_bound(S.degerlendir)
-            if G.S.lig != S.lig:
-                return
-        ev = S.degerlendir()
+        ev, onbellekten = await run.io_bound(degerlendir_onbellekli, S, G.depo.veri_klasoru, G.depo.g.ham)
+        if G.S.lig != S.lig:
+            return
         alt.set_visibility(True)
         bu = 'o' if onceki_not else 'bu'
         lead.text = onceki_not + (f'Test: {bu} sezonun son {ev["n_test"]} maçı. Tek sezon: modeller yalnızca {bu} sezonun ilk {ev["n_egitim"]} maçıyla eğitildi.'
                      + (f' Önceki sezonlarla: buna önceki {ev["n_onceki"]} sezonun {ev["n_gecmis"]} maçı eklendi, Elo ve takım '
                         'güçleri sezondan sezona taşındı' + (', maçların xG değerleri de özellik olarak kullanıldı' if ev['xg'] else '') + '.'
                         if ev['n_onceki'] else ' Bu lig için önceki sezon verisi yok.')
-                     + ' Log-loss olasılıkların kalitesini ölçer: düşük olan daha iyi.')
+                     + ' Log-loss olasılıkların kalitesini ölçer: düşük olan daha iyi.'
+                     + (' (Önbellekten: veri ve model değişmediği için yeniden eğitilmedi.)' if onbellekten else ''))
         son = lambda r: r['cok'] or r['tek']
         en_iyi = min(son(r)['log_loss'] for r in ev['sonuclar'])
         cok_var = bool(ev['n_onceki'])

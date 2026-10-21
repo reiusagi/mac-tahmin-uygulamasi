@@ -51,12 +51,17 @@ DETAY = {'GK': ('G', 'Kaleci'), 'CB': ('D', 'Stoper'), 'RB': ('D', 'Sağ bek'), 
 YAS_GRUPLARI = {'U18': (0, 17), 'U21': (0, 20), 'U23': (0, 22), '23-29': (23, 29), '30+': (30, 99)}
 
 
-# Puan eşitliğinde sıralama (gerçek lig kuralları). 'averaj': averaj, atılan gol (varsayılan; İngiltere, Almanya, Fransa,
-# Hollanda, İskoçya, İsviçre, Norveç, Arjantin…). 'ikili': eşit puanlı takımların kendi aralarındaki maçlar (puan, averaj),
-# sonra genel averaj ve atılan gol. 'galibiyet': galibiyet sayısı, averaj, atılan gol (Brezilya). Emin olunmayan ligler
-# (Belçika: galibiyet sayısı önce olabilir; Avusturya) varsayılanda bırakıldı.
+# Puan eşitliğinde sıralama (2025/26 ve 2026 lig kuralları). 'averaj': averaj, atılan gol (varsayılan; İngiltere,
+# Championship, Almanya, Hollanda, İskoçya, İsviçre, Norveç, Arjantin; ikili maç ancak bunlardan sonra gelir). 'ikili':
+# eşit puanlı takımların kendi aralarındaki maçlar (puan, averaj), sonra genel averaj ve atılan gol (İspanya, İtalya,
+# Türkiye, Portekiz, Yunanistan, Suudi Arabistan, Avusturya). 'averaj_ikili': önce genel averaj, averaj da eşitse ikili
+# maçlar (puan, averaj), sonra atılan gol (Fransa, 2025/26'dan beri). 'galibiyet': galibiyet sayısı, averaj, atılan gol
+# (Brezilya, Belçika). Daha derin ölçütler (deplasman galibiyeti, fair play…) ve bölünen ligler (Belçika, Avusturya,
+# İskoçya, İsviçre, Yunanistan play-off'ları, Belçika/Avusturya'da puanların yarıya inmesi) modellenmez.
 ESITLIK_KURALI = {'La_liga': 'ikili', 'Serie_A': 'ikili', 'Super_Lig': 'ikili', 'Primeira_Liga': 'ikili',
-                  'Greek_Super_League': 'ikili', 'Saudi_Pro_League': 'ikili', 'Brasileirao': 'galibiyet'}
+                  'Greek_Super_League': 'ikili', 'Saudi_Pro_League': 'ikili', 'Austria_Bundesliga': 'ikili',
+                  'Ligue_1': 'averaj_ikili', 'Brasileirao': 'galibiyet', 'Pro_League': 'galibiyet'}
+IKILI_KURALLAR = ('ikili', 'averaj_ikili')  # ikili maç tablosu kuran kurallar
 
 
 def esitlik_kurali(anahtar):
@@ -64,20 +69,23 @@ def esitlik_kurali(anahtar):
 
 
 def tablo_sirala(tb, M, kural='averaj'):
-    """Puan durumu sırası (tb: takım satırları, M: oynanmış maçlar). Puanı eşit olanların hepsi tek grup sayılır ve
-    'ikili' kuralda ikili maç tablosu bu grubun maçlarından kurulur (grup içinde kısmi eşitlikte yeniden bölünmez)."""
+    """Puan durumu sırası (tb: takım satırları, M: oynanmış maçlar). 'ikili' kuralda puanı eşit olanların hepsi,
+    'averaj_ikili' kuralda puanı ve averajı eşit olanlar tek grup sayılır; ikili maç tablosu bu grubun maçlarından kurulur
+    (grup içinde kısmi eşitlikte yeniden bölünmez)."""
     if kural == 'galibiyet':
         return sorted(tb, key=lambda r: (-r['P'], -r['G'], -r['AV'], -r['AG']))
-    if kural != 'ikili':
+    if kural not in IKILI_KURALLAR:
         return sorted(tb, key=lambda r: (-r['P'], -r['AV'], -r['AG']))
-    puan = {r['i']: r['P'] for r in tb}
-    ikili = {i: [0, 0] for i in puan}  # takım -> [ikili puan, ikili averaj]
+    grup = {r['i']: (r['P'], r['AV']) if kural == 'averaj_ikili' else r['P'] for r in tb}
+    ikili = {i: [0, 0] for i in grup}  # takım -> [ikili puan, ikili averaj]
     for m in M:
-        if m.h in puan and m.a in puan and puan[m.h] == puan[m.a]:
+        if m.h in grup and m.a in grup and grup[m.h] == grup[m.a]:
             ikili[m.h][1] += m.hg - m.ag
             ikili[m.a][1] += m.ag - m.hg
             ikili[m.h][0] += 3 if m.hg > m.ag else 1 if m.hg == m.ag else 0
             ikili[m.a][0] += 3 if m.ag > m.hg else 1 if m.hg == m.ag else 0
+    if kural == 'averaj_ikili':
+        return sorted(tb, key=lambda r: (-r['P'], -r['AV'], -ikili[r['i']][0], -ikili[r['i']][1], -r['AG']))
     return sorted(tb, key=lambda r: (-r['P'], -ikili[r['i']][0], -ikili[r['i']][1], -r['AV'], -r['AG']))
 
 
@@ -561,8 +569,8 @@ class Sezon:
     # ------------------------------------------------------------ sezon simülasyonu
 
     def simulasyon(self, N=10000, sabit=None):
-        """Kalan maçları Poisson modeliyle N kez oynatır; eşit puanda ligin kuralı (ESITLIK_KURALI: averaj, ikili maç ya da
-        galibiyet sayısı), sonra atılan gol, sonra kura. İkili maç kuralında puanı eşit takımların birbirleriyle oynadığı
+        """Kalan maçları Poisson modeliyle N kez oynatır; eşit puanda ligin kuralı (ESITLIK_KURALI: averaj, ikili maç, averajdan
+        sonra ikili maç ya da galibiyet sayısı), sonra atılan gol, sonra kura. İkili maç kuralında puanı eşit takımların birbirleriyle oynadığı
         maçlardan mini tablo (puan, averaj) hesaplanır; simülasyon başına kısmi eşitlikte yeniden bölünmez. Takım başına
         beklenen puan ve sıra dağılımı döner. Bütün simülasyonlar numpy ile birlikte oynatılır; sabit tohum sayesinde sonuç
         her çalıştırmada aynıdır. sabit: {(ev, dep): (ev golü, dep golü)} — "ya şöyle olursa": bu maçlar her simülasyonda
@@ -575,7 +583,7 @@ class Sezon:
         gd = np.tile(np.array([r['AV'] for r in self.tb], dtype=np.int64), (N, 1))
         gf = np.tile(np.array([r['AG'] for r in self.tb], dtype=np.int64), (N, 1))
         gal = np.tile(np.array([r['G'] for r in self.tb], dtype=np.int64), (N, 1))
-        if kural == 'ikili':  # ik_p[i, j]: i takımının j'ye karşı puanı (ik_g: averajı); oynanmış maçlar, sonra simülasyonlar
+        if kural in IKILI_KURALLAR:  # ik_p[i, j]: i takımının j'ye karşı puanı (ik_g: averajı); oynanmış maçlar, sonra simülasyonlar
             ik_p, ik_g = np.zeros((n, n), dtype=np.int32), np.zeros((n, n), dtype=np.int32)
             for m in self.M:
                 ik_p[m.h, m.a] += 3 if m.hg > m.ag else 1 if m.hg == m.ag else 0
@@ -599,14 +607,17 @@ class Sezon:
                 gf[:, ev[j]] += hg[:, j]; gf[:, dep[j]] += ag[:, j]
                 gd[:, ev[j]] += hg[:, j] - ag[:, j]; gd[:, dep[j]] += ag[:, j] - hg[:, j]
                 gal[:, ev[j]] += hg[:, j] > ag[:, j]; gal[:, dep[j]] += ag[:, j] > hg[:, j]
-                if kural == 'ikili':
+                if kural in IKILI_KURALLAR:
                     ik_p[:, ev[j], dep[j]] += ev_p[:, j]; ik_p[:, dep[j], ev[j]] += dep_p[:, j]
                     ik_g[:, ev[j], dep[j]] += hg[:, j] - ag[:, j]; ik_g[:, dep[j], ev[j]] += ag[:, j] - hg[:, j]
         kura = R.random((N, n))
         # lexsort'ta son anahtar öncelikli; her ölçüt ayrı anahtar olduğundan büyük averaj / gol sayıları birbirini ezmez
-        if kural == 'ikili':
+        if kural in IKILI_KURALLAR:
             esit = pts[:, :, None] == pts[:, None, :]  # puanı eşit takımlar (kendisi dahil; kendine karşı maç yok)
-            anahtarlar = (kura, -gf, -gd, -np.where(esit, ik_g, 0).sum(axis=2), -np.where(esit, ik_p, 0).sum(axis=2), -pts)
+            if kural == 'averaj_ikili':
+                esit &= gd[:, :, None] == gd[:, None, :]  # …ve averajı da eşit
+            ikp, ikg = -np.where(esit, ik_p, 0).sum(axis=2), -np.where(esit, ik_g, 0).sum(axis=2)
+            anahtarlar = (kura, -gf, ikg, ikp, -gd, -pts) if kural == 'averaj_ikili' else (kura, -gf, -gd, ikg, ikp, -pts)
         elif kural == 'galibiyet':
             anahtarlar = (kura, -gf, -gd, -gal, -pts)
         else:

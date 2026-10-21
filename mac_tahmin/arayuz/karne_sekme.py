@@ -16,6 +16,7 @@ TEMBEL = True
 # güven dilimleri: en olası sonucun olasılığına göre (Maç tahmini sekmesindeki model güveniyle aynı sınırlar)
 GUVEN = [('Emin (%60 ve üstü)', 0.60, 1.01), ('Orta (%45–60)', 0.45, 0.60), ('Dengeli maç (%45 altı)', 0.0, 0.45)]
 HAFTA_SAYISI = 30  # hafta hafta grafikte en çok bu kadar son hafta
+KAL_EN_AZ = 20  # kalibrasyon grafiğinde bir dilimin gösterilmesi için en az olasılık sayısı (azı çok oynak)
 
 
 def _sonuc(r):
@@ -48,10 +49,32 @@ def haftalik(K):
     return [(g, *v) for g, v in sorted(h.items())]
 
 
-def kalibrasyon_sapmasi(kal):
-    """Kalibrasyon dilimlerinde söylenen ile gerçekleşen arasındaki ortalama fark (yüzde puanı, maç sayısıyla ağırlıklı)."""
-    n = sum(c for _, _, c in kal)
-    return sum(abs(a - b) * c for a, b, c in kal) / n * 100 if n else None
+def kalibrasyon_sapmasi(tablo):
+    """Kalibrasyon dilimlerinde (karne.kalibrasyon_tablosu) söylenen ile gerçekleşen arasındaki ortalama fark: beklenen
+    kalibrasyon hatası, yüzde puanı (olasılık sayısıyla ağırlıklı). Boş tabloda None."""
+    h = karne.kalibrasyon_hatasi(tablo)
+    return None if h is None else h * 100
+
+
+def kalibrasyon_noktalari(tablo, en_az=KAL_EN_AZ):
+    """Grafik noktaları: en az en_az olasılıklı dilimler; nokta büyüklüğü olasılık sayısıyla artar."""
+    return [{'value': [round(d['tahmin'] * 100, 1), round(d['oran'] * 100, 1)], 'name': f'{d["n"]} olasılık',
+             'symbolSize': round(min(22, 6 + d['n'] ** 0.5 / 3))} for d in tablo if d['n'] >= en_az]
+
+
+def kalibrasyon_html(tablo):
+    """Kalibrasyon tablosu: dilim, olasılık sayısı, modelin dediği, gerçekte olan ve fark (yüzde puanı)."""
+    if not tablo:
+        return ''
+    satir = []
+    for d in tablo:
+        f = (d['oran'] - d['tahmin']) * 100
+        satir.append(f'<tr><td>%{round(d["alt"] * 100)}–{round(d["ust"] * 100)}</td><td>{d["n"]}</td>'
+                     f'<td>{yuzde(d["tahmin"])}</td><td class="hi">{yuzde(d["oran"])}</td>'
+                     f'<td style="color:{"var(--bad)" if abs(f) >= 5 and d["n"] >= KAL_EN_AZ else "inherit"}">'
+                     f'{"+" if f >= 0 else "−"}{fmt(abs(f), 1)}</td></tr>')
+    return ('<table class="tb"><thead><tr><th>Dilim</th><th>Olasılık</th><th>Dediği (ort.)</th><th>Gerçekte</th>'
+            '<th>Fark (puan)</th></tr></thead><tbody>' + ''.join(satir) + '</tbody></table>')
 
 
 def kur(G):
@@ -63,8 +86,9 @@ def kur(G):
                  'geçen sezon, bütün ligler.').classes('lead')
         ui.label(f'Not: Model ayarları (yarı ömür, xG payı, Elo harmanı…) {SON_SEZON - 1} sezonunda seçildi; o sezonun sonuçları '
                  f'"ayar dönemi (örneklem içi)" olduğundan iyi görünebilir. Gerçek sınav {SON_SEZON} sezonudur '
-                 '(doğrulama). Karne temel Poisson + Elo modelini ölçer; ekrandaki tahminde ayrıca kadro değeri eğimi gibi '
-                 'süren sezon düzeltmeleri vardır.').classes('cap')
+                 '(doğrulama). Karne, ekrandaki tahminle aynı işlevi (Poisson + Dixon-Coles + Elo harmanı) ölçer; yalnızca kadro '
+                 'değeri eğimi dışarıda: elde yalnızca bugünkü kadro değerleri var, geçmiş maçlarda kullanmak sonradan '
+                 'öğrenilen bilgi olur.').classes('cap')
         with ui.row().classes('w-full items-end gap-3'):
             sezon_sec = ui.select({0: 'İki sezon', SON_SEZON: 'Bu sezon (doğrulama)', SON_SEZON - 1: 'Geçen sezon (ayar dönemi, örneklem içi)'}, value=0,
                                   label='Sezon', on_change=lambda _: ciz()).props('outlined dense options-dense').style('min-width:150px')
@@ -88,6 +112,8 @@ def kur(G):
                             'lineStyle': {'type': 'dashed', 'color': '#8a9088'}},
                            {'type': 'scatter', 'data': [], 'symbolSize': 9, 'itemStyle': {'color': '#2f7a57'}}],
             }).classes('w-full').style('height:280px')
+            with ui.expansion('Dilim dilim kalibrasyon tablosu', icon='table_rows').classes('w-full').props('dense'):
+                kal_tablo = ui.html('', sanitize=False).classes('w-full kaydir')
     with ui.column().classes('panel'):
         ui.html('<h3>Hafta hafta</h3>', sanitize=False)
         hafta_yazi = ui.label().classes('cap')
@@ -127,14 +153,14 @@ def kur(G):
         o = karne.ozet(K)
         if not o:
             ozet.content = '<p class="cap">Bu seçimde tahmin yok.</p>'
-            for oge in (guven, ligler, son, goller, teknik):
+            for oge in (guven, ligler, son, goller, teknik, kal_tablo):
                 oge.content = ''
             return
         n = o['n']
         gd = guven_dilimleri(K)
         emin = next((x for x in gd if x[0].startswith('Emin')), None)
         fark = (o['isabet'] - o['ev_isabet']) * 100
-        sapma = kalibrasyon_sapmasi(o['kalibrasyon'])
+        sapma = kalibrasyon_sapmasi(o['kalibrasyon_tablosu'])
 
         def kart(buyuk, cumle, alt):
             return (f'<div class="dg-kart"><div class="dg-sayi">{buyuk}</div><div class="dg-cumle">{cumle}</div>'
@@ -158,12 +184,15 @@ def kur(G):
                          '<p class="cap">İyi bir model emin olduğunda daha çok tutturur ve "dediği" ile "gerçekte bildiği" '
                          'birbirine yakın olur. Dengeli maçlarda en olası sonuç bile düşük olasılıklıdır; orada çok tutmaması '
                          'normaldir.</p>')
-        grafik.options['series'][1]['data'] = [{'value': [round(a * 100, 1), round(b * 100, 1)], 'name': f'{c} tahmin'}
-                                               for a, b, c in o['kalibrasyon']]
+        grafik.options['series'][1]['data'] = kalibrasyon_noktalari(o['kalibrasyon_tablosu'])
         grafik.update()
-        kal_yazi.text = ('Her nokta bir olasılık dilimi: yatayda modelin dediği, dikeyde o tahminlerin gerçekleşme oranı. '
-                         'Noktalar kesikli çizgiye ne kadar yakınsa olasılıklar o kadar dürüst: "%60" dediği şeyler gerçekten '
-                         '~%60 oluyor demektir.')
+        kal_yazi.text = ('Her nokta bir olasılık dilimi (her maçın ev, beraberlik ve deplasman olasılıkları ayrı ayrı): yatayda '
+                         'modelin dediği, dikeyde o tahminlerin gerçekleşme oranı; büyük nokta çok tahmin demek. Noktalar '
+                         'kesikli çizgiye ne kadar yakınsa olasılıklar o kadar dürüst: "%60" dediği şeyler gerçekten ~%60 oluyor '
+                         f'demektir. Ortalama sapma (beklenen kalibrasyon hatası, ECE): ±{fmt(sapma, 1)} puan.')
+        kal_tablo.content = (kalibrasyon_html(o['kalibrasyon_tablosu'])
+                             + f'<p class="cap">Fark: gerçekte olan eksi modelin dediği. {KAL_EN_AZ} olasılıktan az olan dilimler '
+                             'grafikte gösterilmez (çok oynak); kırmızı: yeterince tahminli dilimde 5 puan ve üstü sapma.</p>')
         hf = haftalik(K)[-HAFTA_SAYISI:]
         ort = lambda i, j: round(sum(x[j] for x in hf[max(0, i - 3):i + 1]) / sum(x[1] for x in hf[max(0, i - 3):i + 1]) * 100, 1)  # noqa: E731
         hafta_grafik.options['xAxis']['data'] = [kisa_gun(g) for g, *_ in hf]
@@ -218,7 +247,7 @@ def kur(G):
         teknik.content = (
             '<div class="tiles">' + ''.join(f'<div class="tile"><span class="num">{v}</span><small>{a}</small></div>' for a, v in (
                 ('Log-kayıp', fmt(o['log_kayip'], 3)), ('Bilgisiz tahminin', fmt(o['bilgisiz_log_kayip'], 3)),
-                ('Brier', fmt(o['brier'], 3)))) + '</div>'
+                ('Brier', fmt(o['brier'], 3)), ('Kalibrasyon hatası (ECE)', fmt(o['ece'], 3)))) + '</div>'
             f'<p class="cap" style="margin-top:6px"><b>Log-kayıp</b> ve <b>Brier</b> düşük olan iyidir; yalnızca "bildi mi" '
             f'değil olasılıkların kendisini ölçer (%90 deyip yanılmak, %55 deyip yanılmaktan çok daha pahalıdır). Modeldeki '
             f'her değişiklik bu ölçüyle sınanır. <b>Bilgisiz tahmin</b>: her maça ligin genel oranlarını (ev '

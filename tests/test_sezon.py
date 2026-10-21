@@ -8,8 +8,13 @@ from mac_tahmin import sezon as sz
 from mac_tahmin.modeller import Mac
 from mac_tahmin.sezon import LIGLER, Sezon
 
-H2H_LIGLERI = {'La_liga', 'Serie_A', 'Super_Lig', 'Primeira_Liga', 'Greek_Super_League', 'Saudi_Pro_League'}
-DIGER_LIGLER = [l[0] for l in LIGLER if l[0] not in H2H_LIGLERI and l[0] != 'Brasileirao']
+H2H_LIGLERI = {'La_liga', 'Serie_A', 'Super_Lig', 'Primeira_Liga', 'Greek_Super_League', 'Saudi_Pro_League',
+               'Austria_Bundesliga'}
+GALIBIYET_LIGLERI = {'Brasileirao', 'Pro_League'}
+AVERAJ_IKILI_LIGLERI = {'Ligue_1'}  # önce genel averaj, sonra ikili maç
+DIGER_LIGLER = [l[0] for l in LIGLER if l[0] not in H2H_LIGLERI | GALIBIYET_LIGLERI | AVERAJ_IKILI_LIGLERI]
+# X ile Y puanda (3) ve averajda (+1) eşit; X daha çok gol attı, Y ikili maçı kazandı. A da 3 puan ama averajı -2.
+AVERAJ_ESIT = [('Y', 'X', 2, 0), ('X', 'A', 4, 1), ('A', 'Y', 1, 0)]
 
 # A ile B puanda eşit (6); A'nın averajı iyi, B ikili maçı kazandı. C ile D de puanda eşit (1), ikili maç berabere.
 TAKIMLAR = ['A', 'B', 'C', 'D']
@@ -52,7 +57,8 @@ def test_bos_sezon_cokmez():
 
 def test_esitlik_kurali_lig_listesi():
     assert {k for k, v in sz.ESITLIK_KURALI.items() if v == 'ikili'} == H2H_LIGLERI
-    assert {k for k, v in sz.ESITLIK_KURALI.items() if v == 'galibiyet'} == {'Brasileirao'}
+    assert {k for k, v in sz.ESITLIK_KURALI.items() if v == 'galibiyet'} == GALIBIYET_LIGLERI
+    assert {k for k, v in sz.ESITLIK_KURALI.items() if v == 'averaj_ikili'} == AVERAJ_IKILI_LIGLERI
     assert set(sz.ESITLIK_KURALI) <= {l[0] for l in LIGLER}
     assert sz.esitlik_kurali('EPL') == 'averaj'
     assert sz.esitlik_kurali(None) == 'averaj'
@@ -65,10 +71,30 @@ def test_ikili_maç_kuralli_ligde_ikili_mac_averajdan_once(lig):
     assert sira(S) == ['B', 'A', 'D', 'C']  # B ikili maçı kazandı; C-D ikilisi berabere, D genel averajda önde
 
 
-@pytest.mark.parametrize('lig', DIGER_LIGLER + [None])
+@pytest.mark.parametrize('lig', DIGER_LIGLER + [None] + sorted(AVERAJ_IKILI_LIGLERI))
 def test_averaj_kuralli_ligde_averaj_once(lig):
     S = sezon_kur(TAKIMLAR, ESIT_PUAN, anahtar=lig)
     assert sira(S) == ['A', 'B', 'D', 'C']
+
+
+def test_ligue_1_averaj_esitse_ikili_mac_atilan_golden_once():
+    T = ['X', 'Y', 'A']
+    assert sira(sezon_kur(T, AVERAJ_ESIT, anahtar='Ligue_1')) == ['Y', 'X', 'A']
+    assert sira(sezon_kur(T, AVERAJ_ESIT, anahtar='EPL')) == ['X', 'Y', 'A']  # atılan gol
+
+
+def test_tablo_sirala_averaj_ikili_grup_puan_ve_averajla_kurulur():
+    # 0 ile 1 puan ve averajda eşit, 1 ikili maçı kazandı; 2 aynı puanda ama averajı farklı: grubun dışında
+    tb = [_satir(0, 10, 5, 20), _satir(1, 10, 5, 8), _satir(2, 10, 3, 30)]
+    M = [Mac('2026-08-01', 1, 0, 1, 0), Mac('2026-08-08', 2, 1, 5, 0)]  # 2'nin 1'i yenmesi gruba sayılmaz
+    assert [r['i'] for r in sz.tablo_sirala(tb, M, 'averaj_ikili')] == [1, 0, 2]
+    assert [r['i'] for r in sz.tablo_sirala(tb, M, 'averaj')] == [0, 1, 2]
+
+
+def test_belcika_galibiyet_sayisi_averajdan_once():
+    oy = [('X', 'A', 0, 0), ('X', 'B', 0, 0), ('X', 'C', 0, 0), ('Y', 'A', 1, 0), ('B', 'Y', 2, 0), ('C', 'Y', 3, 0)]
+    S = sezon_kur(['X', 'Y', 'A', 'B', 'C'], oy, anahtar='Pro_League')
+    assert sira(S).index('Y') < sira(S).index('X')
 
 
 def test_brasileirao_galibiyet_sayisi_averajdan_once():
@@ -140,6 +166,17 @@ def test_simulasyon_ikili_kuralda_B_A_nin_onunde():
     d = _dagilim(_tam_bitmis('Serie_A'), N=200)
     assert d['B'][0] == 1.0 and d['A'][1] == 1.0
     d = _dagilim(_tam_bitmis('EPL'), N=200)
+    assert d['A'][0] == 1.0 and d['B'][1] == 1.0
+
+
+def test_simulasyon_ligue_1_averaj_sonra_ikili():
+    S = sezon_kur(['X', 'Y', 'A'], AVERAJ_ESIT, anahtar='Ligue_1')
+    d = _dagilim(S, N=200)
+    assert d['Y'][0] == 1.0 and d['X'][1] == 1.0 and d['A'][2] == 1.0
+    d = _dagilim(sezon_kur(['X', 'Y', 'A'], AVERAJ_ESIT, anahtar='EPL'), N=200)
+    assert d['X'][0] == 1.0 and d['Y'][1] == 1.0
+    # puanı eşit ama averajı farklı olanlar arasında ikili maç bakılmaz
+    d = _dagilim(_tam_bitmis('Ligue_1'), N=200)
     assert d['A'][0] == 1.0 and d['B'][1] == 1.0
 
 

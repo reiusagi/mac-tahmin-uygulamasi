@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import sema
 from .logo import LIG_LOGO as LOGO  # noqa: F401  (eski ad)
 from .modeller import sonuc_olasiliklari
 from .ulkeler import turkce
@@ -102,6 +103,7 @@ def _getir(ham, tid, sezon=None, yenile=False, klasor='milli'):
     if yol.exists() and not yenile:
         return json.loads(yol.read_text(encoding='utf-8'))
     j = json_getir(fotmob_url('leagues', id=tid, season=sezon or None))
+    sema.kontrol('kupa', j)
     yol.parent.mkdir(parents=True, exist_ok=True)
     yol.write_text(json.dumps(j, ensure_ascii=False), encoding='utf-8')
     time.sleep(0.3)
