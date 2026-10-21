@@ -10,7 +10,7 @@ from .. import hava
 from ..logo import logo_html, takim_logo_url
 from ..mac_ozeti import ayrinti
 from ..ulkeler import turkce
-from .ortak import e, hata_metni, hava_html, kisa_gun, tahmine_git, takim_tiklama, yerel
+from .ortak import e, hata_metni, hava_html, kisa_gun, tahmin_acilabilir, tahmine_git, takim_tiklama, yerel
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +325,7 @@ class _MacKarti:
             grup = lig.group(2)
         self.baslik.text = ' · '.join(x for x in (b, grup) if x)
         self.sekme.set_value('olay' if m['durum'] in ('canli', 'bitti') else 'kadro')
-        self.tahmin_dugme.set_visibility(m['durum'] != 'canli')  # canlı maçta tahmine geçilmez (ortak.tahmine_git)
+        self.tahmin_dugme.set_visibility(tahmin_acilabilir(m))  # canlı lig maçında tahmine geçilmez
         self.kart.open()
         await self.yukle(m, ilk=True)
 

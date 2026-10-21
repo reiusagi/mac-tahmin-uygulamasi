@@ -53,20 +53,30 @@ def takim_tiklama(oge, G):
     return oge
 
 
+KUPA_ONEKLERI = ('avrupa-', 'kupa-', 'milli-')  # canlı skordaki lig anahtarı: kupa ve milli maçlar
+
+
+def tahmin_acilabilir(m):
+    """Canlı skordaki maçın tahmini açılabilir mi: canlı lig maçında hayır (lig tahmini kendi sekmesidir, açık sekme
+    korunur); kupa ve milli maçların ayrıntılı tahmini pencere olarak her zaman açılır."""
+    return m.get('durum') != 'canli' or (m.get('lig') or '').startswith(KUPA_ONEKLERI)
+
+
 def tahmine_git(G, m):
     """Canlı skor verisindeki bir maçın tahminine geçer: uygulamanın liginde Maç tahmini sekmesinde o maç; Avrupa / yerel
-    kupa ya da milli maçta ilgili sekme (ayrıntılı tahmin orada maça tıklayınca açılır). Döner: geçildiyse True."""
+    kupa ya da milli maçta ayrıntılı tahmin penceresi, açık sekme değişmeden (maç kimliği yoksa ilgili sekmeye geçilir).
+    Döner: geçildiyse True."""
     from nicegui import ui
-    if m.get('durum') == 'canli':
+    if not tahmin_acilabilir(m):
         return False
     lig = m.get('lig') or ''
-    if lig.startswith(('avrupa-', 'kupa-', 'milli-')):  # sekme arkada açılır, maçın ayrıntılı tahmini önde
+    if lig.startswith(KUPA_ONEKLERI):
         milli_mi = lig.startswith('milli-')
-        G.sekme_ac('milli' if milli_mi else 'avrupa')
         kimlik = lig.split('-', 1)[1]
         if sayi_kimlik(kimlik) and m.get('id'):
             (G.milli_mac_ac if milli_mi else G.avrupa_mac_ac)(int(kimlik), m['id'])
         else:
+            G.sekme_ac('milli' if milli_mi else 'avrupa')
             ui.notify('Ayrıntılı tahmin için bu sekmede maça tıkla.')
         return True
     ters = {str(v): ad for ad, v in (G.depo.stadyumlar()['ligler'].get(lig) or {}).items()}
