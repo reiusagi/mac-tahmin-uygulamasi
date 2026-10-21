@@ -191,9 +191,13 @@ def _puan_tablosu_html(depo, S):
                         f'<td>{r["B"]}</td><td>{r["M"]}</td><td>{r["AG"]}</td><td>{r["YG"]}</td>'
                         f'<td>{"+" if r["AV"] > 0 else ""}{r["AV"]}</td><td>{xv(r["xG"])}</td><td>{xv(r["xGA"])}</td>'
                         f'<td class="pts">{r["P"]}</td><td><span class="form">{f}</span></td></tr>')
-    return ('<table class="tb"><thead><tr><th>#</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th>'
+    # puan-tablo ve md-lejant (bölge açıklaması) yalnızca modern görünümde biçimlenir / görünür (stil_modern.py)
+    return ('<table class="tb puan-tablo"><thead><tr><th>#</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th>'
             '<th>YG</th><th>AV</th><th>xG</th><th>xGA</th><th>P</th><th>Form</th></tr></thead><tbody>'
-            + ''.join(satirlar) + '</tbody></table>')
+            + ''.join(satirlar) + '</tbody></table>'
+            '<div class="md-lejant"><span><i class="champ"></i>Lider</span><span><i class="cl"></i>İlk 4</span>'
+            '<span><i class="rel"></i>Son 3 (düşme hattı)</span><span>Form: G galibiyet · B beraberlik · M mağlubiyet '
+            '(soldan sağa eskiden yeniye)</span></div>')
 
 
 def _krallik_html(depo, S, adet=10):

@@ -11,7 +11,8 @@ from ..logo import logo_html, takim_logo_url
 from ..sezon import SON_SEZON, sezon_etiketi
 from . import (avrupa_sekme, bildirim, canli_sekme, guc, haftanin, karne_sekme, kiyas, mac_karti, milli_sekme, model_sekme,
                mac_tahmini, oyun, oyuncu_karti, oyuncular, scout, tablo, tahmin, takim_karti, takimlarim, yildizlar)
-from .ortak import CSS, KAYNAK, PALETLER, TEMALAR, UYGULAMA, hata_metni, lig_bilgi, lig_secenekleri, sezon_secenekleri
+from .ortak import CSS, KAYNAK, PALETLER, STILLER, TEMALAR, UYGULAMA, hata_metni, lig_bilgi, lig_secenekleri, sezon_secenekleri
+from .stil_modern import CSS_MODERN
 
 # sekmeler, göründükleri sırayla
 SEKMELER = [tahmin, canli_sekme, takimlarim, haftanin, avrupa_sekme, tablo, oyuncular, yildizlar, scout, kiyas, guc, model_sekme,
@@ -68,12 +69,14 @@ class _Sayfa:
 
     def __init__(self, depo):
         ui.add_css(CSS)
+        ui.add_css(CSS_MODERN)  # yalnızca body.stil-modern altında etkili
         ui.colors(primary='#1c5b3e', secondary='#2f7a57', accent='#c9960f', positive='#2f7a57', negative='#b0413e')
         # görünüm (başlıktaki palet düğmesi): tema bilgisayara göre / açık / koyu, renk paleti (ortak.PALETLER)
         self.gorunum = dict(app.storage.general.get('gorunum') or {})
         self.karanlik = ui.dark_mode({'acik': False, 'koyu': True}.get(self.gorunum.get('tema')))
         palet0 = self.gorunum.get('palet') if self.gorunum.get('palet') in PALETLER else 'saha'
-        ui.query('body').classes(add=f'palet-{palet0}')
+        stil0 = self.gorunum.get('stil') if self.gorunum.get('stil') in STILLER else 'klasik'
+        ui.query('body').classes(add=f'palet-{palet0}' + (' stil-modern' if stil0 == 'modern' else ''))
         self.G = G = Gorunum(depo)
         hafiza = app.storage.general.get('son', {})
         lig0 = hafiza.get('lig', VARSAYILAN[0])
@@ -136,6 +139,10 @@ class _Sayfa:
             with ui.button(icon='palette').props('flat round dense').tooltip('Görünüm: tema ve renkler'):
                 with ui.menu().props('auto-close=false'):
                     with ui.column().classes('gap-2').style('padding:12px 14px;min-width:260px'):
+                        ui.label('Stil').classes('cap').style('font-weight:600')
+                        ui.toggle(STILLER, value=gorunum.get('stil') if gorunum.get('stil') in STILLER else 'klasik',
+                                  on_change=lambda ev: self.stil_degisti(ev.value)).props(
+                            'dense no-caps unelevated toggle-color=primary')
                         ui.label('Tema').classes('cap').style('font-weight:600')
                         ui.toggle(TEMALAR, value=gorunum.get('tema') if gorunum.get('tema') in TEMALAR else 'oto',
                                   on_change=lambda ev: self.tema_degisti(ev.value)).props(
@@ -188,6 +195,17 @@ class _Sayfa:
     def tema_degisti(self, tema):
         self.karanlik.set_value({'acik': False, 'koyu': True}.get(tema))
         self.gorunum['tema'] = tema
+        app.storage.general['gorunum'] = dict(self.gorunum)
+
+    def stil_degisti(self, stil):
+        """Klasik / modern görünüm: body'deki stil-modern sınıfı (yeniden yüklemeden uygulanır) ve kalıcı ayar."""
+        if stil not in STILLER:
+            return
+        if stil == 'modern':
+            ui.query('body').classes(add='stil-modern')
+        else:
+            ui.query('body').classes(remove='stil-modern')
+        self.gorunum['stil'] = stil
         app.storage.general['gorunum'] = dict(self.gorunum)
 
     def palet_degisti(self, palet):

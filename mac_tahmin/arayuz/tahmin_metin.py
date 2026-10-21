@@ -5,7 +5,7 @@ from nicegui import ui
 from .. import karne
 from ..modeller import piyasalar
 from ..stadyum import stadyum_bul
-from .ortak import e, fmt, kisa_gun, sayi, tarih_uzun, yerel, yuzde
+from .ortak import e, fmt, kisa_gun, sayi, takim_logo, tarih_uzun, yerel, yuzde
 
 GUVEN_YUKSEK, GUVEN_ORTA = 0.60, 0.45  # model güveni etiketi: en olası sonucun olasılığına göre
 ASIST_ACIKLAMA = ('90 dakika oynarsa en az bir asist yapma olasılığı: takımın beklenen asistleri (beklenen golün '
@@ -78,8 +78,13 @@ def olasilik_html(depo, S, h, a, t):
     sonuc_ad = [f'{S.T[h]} kazanır', 'Beraberlik', f'{S.T[a]} kazanır']
     i_, j_, pr_ = t['skorlar'][0]
     pz_ = piyasalar(t['hucreler'])
+    # modern görünümün logolu maç başlığı (klasikte gizli; stil_modern.py)
+    ust = (f'<div class="md-ust"><div class="md-takim">{takim_logo(depo.takim_kimligi(S.lig, S.T[h]))}<span>{e(S.T[h])}</span></div>'
+           f'<div class="md-orta"><span class="md-eg">{fmt(t["lh"])}<i>–</i>{fmt(t["la"])}</span>'
+           f'<span class="md-eg-ad">Beklenen gol</span></div>'
+           f'<div class="md-takim">{takim_logo(depo.takim_kimligi(S.lig, S.T[a]))}<span>{e(S.T[a])}</span></div></div>')
     return (
-        f'<div class="ozet-cumle">{ozet_cumlesi(S.T[h], S.T[a], p, pz_)}</div>'
+        ust + f'<div class="ozet-cumle">{ozet_cumlesi(S.T[h], S.T[a], p, pz_)}</div>'
         f'<div class="bar"><div class="h" style="flex-basis:{p[0] * 100:.2f}%"></div>'
         f'<div class="d" style="flex-basis:{p[1] * 100:.2f}%"></div>'
         f'<div class="a" style="flex-basis:{p[2] * 100:.2f}%"></div></div>'
