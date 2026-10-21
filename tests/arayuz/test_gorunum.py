@@ -17,21 +17,32 @@ def _stil_dugmesi(yardimci):
     return next(t for t in yardimci.ogeler(ui.toggle) if t.options == list(STILLER) or set(t.options) == set(STILLER))
 
 
-async def test_varsayilan_stil_klasik(yardimci):
-    assert 'stil-modern' not in _body_siniflari(yardimci)
-    assert _stil_dugmesi(yardimci).value == 'klasik'
+async def test_varsayilan_stil_modern(yardimci):
+    assert 'stil-modern' in _body_siniflari(yardimci)
+    assert _stil_dugmesi(yardimci).value == 'modern'
     assert 'stil' not in (app.storage.general.get('gorunum') or {})
 
 
-async def test_modern_secilince_body_sinifi_ve_ayar(yardimci):
+async def test_klasik_secilince_body_sinifi_ve_ayar(yardimci):
     dugme = _stil_dugmesi(yardimci)
-    dugme.set_value('modern')
-    await yardimci.bekle(lambda: 'stil-modern' in _body_siniflari(yardimci), 5, 'body.stil-modern')
-    assert app.storage.general['gorunum']['stil'] == 'modern'
-    assert 'palet-saha' in _body_siniflari(yardimci)  # palet sınıfı korunur
     dugme.set_value('klasik')
     await yardimci.bekle(lambda: 'stil-modern' not in _body_siniflari(yardimci), 5, 'stil-modern kalksın')
     assert app.storage.general['gorunum']['stil'] == 'klasik'
+    assert 'palet-saha' in _body_siniflari(yardimci)  # palet sınıfı korunur
+    dugme.set_value('modern')
+    await yardimci.bekle(lambda: 'stil-modern' in _body_siniflari(yardimci), 5, 'body.stil-modern')
+    assert app.storage.general['gorunum']['stil'] == 'modern'
+
+
+async def test_kayitli_klasik_stil_acilista_uygulanir(user):
+    app.storage.general['gorunum'] = {'stil': 'klasik'}
+    try:
+        await user.open('/')
+        siniflar = next(e for e in user.client.elements.values()
+                        if isinstance(e, QueryElement) and e.props['selector'] == 'body').props['classes']
+        assert 'stil-modern' not in siniflar
+    finally:
+        app.storage.general.pop('gorunum', None)
 
 
 async def test_kayitli_modern_stil_acilista_uygulanir(user):

@@ -11,7 +11,8 @@ from ..logo import logo_html, takim_logo_url
 from ..sezon import SON_SEZON, sezon_etiketi
 from . import (avrupa_sekme, bildirim, canli_sekme, guc, haftanin, karne_sekme, kiyas, mac_karti, milli_sekme, model_sekme,
                mac_tahmini, oyun, oyuncu_karti, oyuncular, scout, tablo, tahmin, takim_karti, takimlarim, yildizlar)
-from .ortak import CSS, KAYNAK, PALETLER, STILLER, TEMALAR, UYGULAMA, hata_metni, lig_bilgi, lig_secenekleri, sezon_secenekleri
+from .ortak import (CSS, KAYNAK, PALETLER, STILLER, TEMALAR, UYGULAMA, VARSAYILAN_STIL, hata_metni, lig_bilgi,
+                    lig_secenekleri, sezon_secenekleri)
 from .stil_modern import CSS_MODERN
 
 # sekmeler, göründükleri sırayla
@@ -75,7 +76,7 @@ class _Sayfa:
         self.gorunum = dict(app.storage.general.get('gorunum') or {})
         self.karanlik = ui.dark_mode({'acik': False, 'koyu': True}.get(self.gorunum.get('tema')))
         palet0 = self.gorunum.get('palet') if self.gorunum.get('palet') in PALETLER else 'saha'
-        stil0 = self.gorunum.get('stil') if self.gorunum.get('stil') in STILLER else 'klasik'
+        stil0 = self.gorunum.get('stil') if self.gorunum.get('stil') in STILLER else VARSAYILAN_STIL
         ui.query('body').classes(add=f'palet-{palet0}' + (' stil-modern' if stil0 == 'modern' else ''))
         self.G = G = Gorunum(depo)
         hafiza = app.storage.general.get('son', {})
@@ -140,7 +141,7 @@ class _Sayfa:
                 with ui.menu().props('auto-close=false'):
                     with ui.column().classes('gap-2').style('padding:12px 14px;min-width:260px'):
                         ui.label('Stil').classes('cap').style('font-weight:600')
-                        ui.toggle(STILLER, value=gorunum.get('stil') if gorunum.get('stil') in STILLER else 'klasik',
+                        ui.toggle(STILLER, value=gorunum.get('stil') if gorunum.get('stil') in STILLER else VARSAYILAN_STIL,
                                   on_change=lambda ev: self.stil_degisti(ev.value)).props(
                             'dense no-caps unelevated toggle-color=primary')
                         ui.label('Tema').classes('cap').style('font-weight:600')

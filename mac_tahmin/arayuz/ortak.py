@@ -80,8 +80,9 @@ def tahmine_git(G, m):
 PALETLER = {'saha': ('Saha yeşili', '#1c5b3e'), 'gece': ('Gece mavisi', '#1f3f73'), 'bordo': ('Bordo', '#7a2335'),
             'grafit': ('Grafit', '#2d3a45')}
 TEMALAR = {'oto': 'Bilgisayara göre', 'acik': 'Açık', 'koyu': 'Koyu'}
-# görünüm stili: 'modern' body'ye stil-modern sınıfını ekler (CSS: stil_modern.py); 'klasik' varsayılan
+# görünüm stili: 'modern' body'ye stil-modern sınıfını ekler (CSS: stil_modern.py); klasik menüden seçilebilir
 STILLER = {'klasik': 'Klasik', 'modern': 'Modern'}
+VARSAYILAN_STIL = 'modern'
 
 
 def piyasa_kartlari(p, pz, lh, la, ev, dep):
