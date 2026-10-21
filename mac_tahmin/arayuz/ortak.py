@@ -57,6 +57,8 @@ def tahmine_git(G, m):
     """Canlı skor verisindeki bir maçın tahminine geçer: uygulamanın liginde Maç tahmini sekmesinde o maç; Avrupa / yerel
     kupa ya da milli maçta ilgili sekme (ayrıntılı tahmin orada maça tıklayınca açılır). Döner: geçildiyse True."""
     from nicegui import ui
+    if m.get('durum') == 'canli':
+        return False
     lig = m.get('lig') or ''
     if lig.startswith(('avrupa-', 'kupa-', 'milli-')):  # sekme arkada açılır, maçın ayrıntılı tahmini önde
         milli_mi = lig.startswith('milli-')

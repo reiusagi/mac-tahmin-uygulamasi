@@ -328,11 +328,11 @@ def _olas_satiri(o, durum):
     if not o:
         return ''
     git = '<span class="link cap">ayrıntılı tahmin ›</span>'
-    if durum == 'canli' and o.get('simdi'):
-        return (f'<span class="cm-olas" data-tahmin="1" title="Şu an: kalan süre ve skora göre (kırmızı kart ve oyunun akışı '
-                f'hesaba katılmaz). Tıklayınca maçın ayrıntılı tahmini açılır.">'
+    if durum == 'canli' and o.get('simdi'):  # canlı maçta tahmine geçilmez (sekme korunur); tıklayınca maç kartı açılır
+        return (f'<span class="cm-olas" title="Şu an: kalan süre ve skora göre (kırmızı kart ve oyunun akışı '
+                f'hesaba katılmaz). Tıklayınca maç kartı açılır.">'
                 f'<span class="cap">Şu an</span>{_olas_kutulari(o["simdi"])}'
-                f'<span class="cap">maç önü {yuzde(o["once"][0])} · {yuzde(o["once"][1])} · {yuzde(o["once"][2])}</span>{git}</span>')
+                f'<span class="cap">maç önü {yuzde(o["once"][0])} · {yuzde(o["once"][1])} · {yuzde(o["once"][2])}</span></span>')
     if durum == 'baslamadi':
         return (f'<span class="cm-olas" data-tahmin="1" title="Tıklayınca maçın ayrıntılı tahmini açılır.">'
                 f'<span class="cap">Tahmin</span>{_olas_kutulari(o["once"])}{git}</span>')

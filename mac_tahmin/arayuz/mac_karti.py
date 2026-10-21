@@ -193,7 +193,7 @@ class _MacKarti:
                 'max-width:820px;background:var(--panel);color:var(--ink)'):
             with ui.row().classes('w-full items-center no-wrap'):
                 self.baslik = ui.label().classes('cap grow')
-                ui.button('Maç tahmini', icon='insights', on_click=lambda: self.tahmine()).props(
+                self.tahmin_dugme = ui.button('Maç tahmini', icon='insights', on_click=lambda: self.tahmine()).props(
                     'flat dense no-caps color=primary').tooltip(
                     'Bu maçın tahminini aç (lig maçında Maç tahmini sekmesi; kupa ve milli maçta ilgili sekme)')
                 ui.button(icon='close', on_click=self.kart.close).props('flat round dense')
@@ -325,6 +325,7 @@ class _MacKarti:
             grup = lig.group(2)
         self.baslik.text = ' · '.join(x for x in (b, grup) if x)
         self.sekme.set_value('olay' if m['durum'] in ('canli', 'bitti') else 'kadro')
+        self.tahmin_dugme.set_visibility(m['durum'] != 'canli')  # canlı maçta tahmine geçilmez (ortak.tahmine_git)
         self.kart.open()
         await self.yukle(m, ilk=True)
 
