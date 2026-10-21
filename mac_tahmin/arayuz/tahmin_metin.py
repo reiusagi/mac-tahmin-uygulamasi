@@ -79,10 +79,11 @@ def olasilik_html(depo, S, h, a, t):
     i_, j_, pr_ = t['skorlar'][0]
     pz_ = piyasalar(t['hucreler'])
     # modern görünümün logolu maç başlığı (klasikte gizli; stil_modern.py)
-    ust = (f'<div class="md-ust"><div class="md-takim">{takim_logo(depo.takim_kimligi(S.lig, S.T[h]))}<span>{e(S.T[h])}</span></div>'
+    ust = (f'<div class="md-ust"><div class="md-takim">{takim_logo(depo.takim_kimligi(S.lig, S.T[h]), "small")}'
+           f'<span>{e(S.T[h])}</span></div>'
            f'<div class="md-orta"><span class="md-eg">{fmt(t["lh"])}<i>–</i>{fmt(t["la"])}</span>'
            f'<span class="md-eg-ad">Beklenen gol</span></div>'
-           f'<div class="md-takim">{takim_logo(depo.takim_kimligi(S.lig, S.T[a]))}<span>{e(S.T[a])}</span></div></div>')
+           f'<div class="md-takim">{takim_logo(depo.takim_kimligi(S.lig, S.T[a]), "small")}<span>{e(S.T[a])}</span></div></div>')
     return (
         ust + f'<div class="ozet-cumle">{ozet_cumlesi(S.T[h], S.T[a], p, pz_)}</div>'
         f'<div class="bar"><div class="h" style="flex-basis:{p[0] * 100:.2f}%"></div>'

@@ -41,9 +41,10 @@ def hata_metni(ex, ne=''):
     return hata_ozeti(ex)
 
 
-def takim_logo(tid):
-    """FotMob takım logosu (küçük); indirilemezse boş kalır."""
-    return logo_html(takim_logo_url(tid), bos='<span class="logo"></span>')
+def takim_logo(tid, boyut='xsmall'):
+    """FotMob takım logosu; indirilemezse boş kalır. boyut: 'xsmall' (35 px, satır içi) ya da 'small' (150 px, büyük
+    gösterilen logolar bulanıklaşmasın)."""
+    return logo_html(takim_logo_url(tid, boyut), bos='<span class="logo"></span>')
 
 
 def takim_tiklama(oge, G):

@@ -49,6 +49,20 @@ def test_logo_html():
     assert logo.logo_html('', bos='-') == '-'
 
 
+def test_takim_logo_boyutu():
+    from mac_tahmin.arayuz.ortak import takim_logo
+    assert '/8695_xsmall.png' in takim_logo(8695)  # küçük satır logoları (35 px)
+    assert '/8695_small.png' in takim_logo(8695, 'small')  # büyük gösterilenler (150 px; 76 px başlıkta keskin)
+
+
+def test_mac_tahmini_basligi_buyuk_logo_kullanir():
+    from mac_tahmin.arayuz import tahmin_metin
+    kaynak = open(tahmin_metin.__file__, encoding='utf-8').read()
+    ust = kaynak[kaynak.index("ust = (f'<div class=\"md-ust\">"):]
+    ust = ust[:ust.index('return')]
+    assert ust.count('"small")') == 2
+
+
 def test_eski_logo_adlari_duruyor():
     from mac_tahmin import avrupa, milli
     assert avrupa.LOGO == milli.LOGO == logo.LIG_LOGO
