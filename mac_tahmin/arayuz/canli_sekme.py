@@ -58,108 +58,137 @@ def _uygun(m, suzgec):
     return True
 
 
-def kur(G):
-    rozet = G.ek[ID]
-    d = {'gun': date.today(), 'son_bugun': date.today(), 'damga': object(), 'istek': 0, 'suzgec': 'tum', 'maclar': None,
-         'olas': {}}  # olas: maç id → olasılıklar (Depo.mac_olasiliklari; arka planda hesaplanır, gelince yeniden çizilir)
-    onbellek = {}  # 'YYYYMMDD' -> (alındığı an, maçlar, ayrıntılı mı)
+def _ozet_html(ms):
+    """Günün maç sayıları: toplam, canlı, biten, başlamayan."""
+    sayi = {k: sum(1 for m in ms if m['durum'] == k) for k in ('canli', 'bitti', 'baslamadi')}
+    parca = [f'<b>{len(ms)}</b> maç']
+    if sayi['canli']:
+        parca.append(f'<span class="canli-yazi"><i class="nabiz"></i>{sayi["canli"]} canlı</span>')
+    if sayi['bitti']:
+        parca.append(f'{sayi["bitti"]} bitti')
+    if sayi['baslamadi']:
+        parca.append(f'{sayi["baslamadi"]} başlamadı')
+    return ' · '.join(parca) if ms else ''
 
-    with ui.column().classes('panel gun-panel gap-2'):
-        with ui.row().classes('w-full items-center no-wrap gap-1'):
-            ui.button(icon='chevron_left', on_click=lambda: gun_degistir(d['gun'] - timedelta(days=1))).props(
-                'flat round dense').tooltip('Önceki gün')
-            with ui.button(icon='event').props('flat dense no-caps').classes('disp gun-dugme') as gun_dugme:
-                with ui.menu() as menu:
-                    takvim = ui.date(mask='YYYY-MM-DD', on_change=lambda ev: takvimden(ev.value, menu)).props(
-                        'minimal first-day-of-week=1')
-            ui.button(icon='chevron_right', on_click=lambda: gun_degistir(d['gun'] + timedelta(days=1))).props(
-                'flat round dense').tooltip('Sonraki gün')
-            bugun_dugme = ui.button('Bugün', on_click=lambda: gun_degistir(date.today())).props('outline dense no-caps size=sm')
-            ui.space()
-            ozet = ui.html('', sanitize=False).classes('gun-ozet')
-        with ui.row().classes('w-full items-center gap-2'):
-            suzgec_dugmeleri = {}
-            for k, ad in SUZGECLER:
-                suzgec_dugmeleri[k] = ui.button(ad, on_click=lambda _, k=k: suzgec_sec(k)).props('dense no-caps unelevated rounded').style(
-                    'padding:2px 12px;font-size:.85rem')
-            ui.space()
-            lead = ui.label().classes('cap')
-    govde = ui.column().classes('w-full gap-3')
+
+def _dk_metni(c, canli_hata):
+    if not c:
+        return 'FotMob verisi, dakikada bir yenilenir.'
+    upd = datetime.fromisoformat(c['guncellendi'])
+    dk = max(0, round((datetime.now(timezone.utc) - upd).total_seconds() / 60))
+    return (f'Son güncelleme {upd.astimezone():%H:%M} ({"az önce" if dk < 1 else f"{dk} dk önce"}) · dakikada bir yenilenir'
+            + (' · son denemede bağlantı kurulamadı' if canli_hata else ''))
+
+
+class _Canli:
+    """Canlı skorlar sekmesi: öğeler özniteliklerde. d['damga'] / d['istek']: aynı veriyle gereksiz yeniden çizim ve eski
+    isteğin geç gelen sonucu engellenir."""
+
+    def __init__(self, G):
+        self.G = G
+        self.rozet = G.ek[ID]
+        self.d = {'gun': date.today(), 'son_bugun': date.today(), 'damga': object(), 'istek': 0, 'suzgec': 'tum', 'maclar': None,
+                  'olas': {}}  # olas: maç id → olasılıklar (Depo.mac_olasiliklari; arka planda hesaplanır, gelince yeniden çizilir)
+        self.onbellek = {}  # 'YYYYMMDD' -> (alındığı an, maçlar, ayrıntılı mı)
+        self._iskelet()
+        G.dinle('canli', self.ciz)
+        ui.timer(30, self.zaman_kontrol)
+        self.gun_degistir(date.today())
+
+    def _iskelet(self):
+        d = self.d
+        with ui.column().classes('panel gun-panel gap-2'):
+            with ui.row().classes('w-full items-center no-wrap gap-1'):
+                ui.button(icon='chevron_left', on_click=lambda: self.gun_degistir(d['gun'] - timedelta(days=1))).props(
+                    'flat round dense').tooltip('Önceki gün')
+                with ui.button(icon='event').props('flat dense no-caps').classes('disp gun-dugme') as self.gun_dugme:
+                    with ui.menu() as menu:
+                        self.takvim = ui.date(mask='YYYY-MM-DD', on_change=lambda ev: self.takvimden(ev.value, menu)).props(
+                            'minimal first-day-of-week=1')
+                ui.button(icon='chevron_right', on_click=lambda: self.gun_degistir(d['gun'] + timedelta(days=1))).props(
+                    'flat round dense').tooltip('Sonraki gün')
+                self.bugun_dugme = ui.button('Bugün', on_click=lambda: self.gun_degistir(date.today())).props(
+                    'outline dense no-caps size=sm')
+                ui.space()
+                self.ozet = ui.html('', sanitize=False).classes('gun-ozet')
+            with ui.row().classes('w-full items-center gap-2'):
+                self.suzgec_dugmeleri = {}
+                for k, ad in SUZGECLER:
+                    self.suzgec_dugmeleri[k] = ui.button(ad, on_click=lambda _, k=k: self.suzgec_sec(k)).props(
+                        'dense no-caps unelevated rounded').style('padding:2px 12px;font-size:.85rem')
+                ui.space()
+                self.lead = ui.label().classes('cap')
+        self.govde = ui.column().classes('w-full gap-3')
 
     # ---------------------------------------------------------------- gün ve süzgeç
-    def takvimden(deger, menu):
-        if deger and date.fromisoformat(deger) != d['gun']:
+    def takvimden(self, deger, menu):
+        if deger and date.fromisoformat(deger) != self.d['gun']:
             menu.close()
-            gun_degistir(date.fromisoformat(deger))
+            self.gun_degistir(date.fromisoformat(deger))
 
-    def gun_degistir(g):
-        d['gun'] = g
-        d['damga'] = object()  # yeniden çiz
-        gun_dugme.set_text(gun_adi(g))
-        takvim.set_value(g.isoformat())
-        bugun_dugme.set_visibility(g != date.today())
-        ciz(True)
+    def gun_degistir(self, g):
+        self.d['gun'] = g
+        self.d['damga'] = object()  # yeniden çiz
+        self.gun_dugme.set_text(gun_adi(g))
+        self.takvim.set_value(g.isoformat())
+        self.bugun_dugme.set_visibility(g != date.today())
+        self.ciz(True)
 
-    def suzgec_sec(k):
-        d['suzgec'] = k
-        if d['maclar'] is not None:
-            maclari_ciz(d['maclar'], d.get('yakinda'))
+    def suzgec_sec(self, k):
+        self.d['suzgec'] = k
+        if self.d['maclar'] is not None:
+            self.maclari_ciz(self.d['maclar'], self.d.get('yakinda'))
 
-    def suzgec_boya(ms):
+    def suzgec_boya(self, ms):
+        d = self.d
         for k, ad in SUZGECLER:
             n = sum(1 for m in ms if _uygun(m, k))
-            b = suzgec_dugmeleri[k]
+            b = self.suzgec_dugmeleri[k]
             b.set_text(f'{ad} {n}' if n or k == 'tum' else ad)
             b.props(f'color={"primary" if d["suzgec"] == k else "grey-3"} text-color={"white" if d["suzgec"] == k else "grey-9"}')
             b.set_enabled(n > 0 or k == 'tum')
 
-    def ciz(zorla=False):
+    def ciz(self, zorla=False):
+        G, d = self.G, self.d
         c = G.depo.g.canli
         canli_say = sum(1 for m in (c or {}).get('maclar', []) if m['durum'] == 'canli')
-        rozet.set_text(str(canli_say))
-        rozet.set_visibility(canli_say > 0)
+        self.rozet.set_text(str(canli_say))
+        self.rozet.set_visibility(canli_say > 0)
         if d['gun'] == date.today() and (c or {}).get('tarih') in (None, date.today().strftime('%Y%m%d')):
-            bugun_ciz(c, zorla)
+            self.bugun_ciz(c, zorla)
         elif zorla:
-            G.arka_plan(baska_gun(d['gun']))
+            G.arka_plan(self.baska_gun(d['gun']))
 
     # ---------------------------------------------------------------- bugün: arka planda yenilenen veri
-    def bugun_ciz(c, zorla):
-        dk_metni(c)
+    def bugun_ciz(self, c, zorla):
+        G, d = self.G, self.d
+        self.lead.text = _dk_metni(c, G.depo.g.canli_hata)
         damga = (c or {}).get('guncellendi'), G.depo.g.canli_hata
         if damga == d['damga'] and not zorla:
             return
         d['damga'] = damga
         if not c:
             d['maclar'] = None
-            ozet.content = ''
-            govde.clear()
-            with govde, ui.column().classes('panel'):
+            self.ozet.content = ''
+            self.govde.clear()
+            with self.govde, ui.column().classes('panel'):
                 ui.label('Canlı skorlar alınamadı; internet bağlantısını kontrol et. Uygulama dakikada bir yeniden dener.'
                          if G.depo.g.canli_hata else 'Canlı skorlar yükleniyor…').classes('lead')
             return
-        maclari_ciz(c.get('maclar') or [], c.get('yakinda'))
-
-    def dk_metni(c):
-        if not c:
-            lead.text = 'FotMob verisi, dakikada bir yenilenir.'
-            return
-        upd = datetime.fromisoformat(c['guncellendi'])
-        dk = max(0, round((datetime.now(timezone.utc) - upd).total_seconds() / 60))
-        lead.text = (f'Son güncelleme {upd.astimezone():%H:%M} ({"az önce" if dk < 1 else f"{dk} dk önce"}) · dakikada bir yenilenir'
-                     + (' · son denemede bağlantı kurulamadı' if G.depo.g.canli_hata else ''))
+        self.maclari_ciz(c.get('maclar') or [], c.get('yakinda'))
 
     # ---------------------------------------------------------------- başka günler: istenince alınır
-    async def baska_gun(g):
+    async def baska_gun(self, g):
+        G, d, govde = self.G, self.d, self.govde
         d['istek'] += 1
         istek = d['istek']
         anahtar = g.strftime('%Y%m%d')
         gecmis = g < date.today()
-        kayit = onbellek.get(anahtar)
+        kayit = self.onbellek.get(anahtar)
         taze = kayit and (gecmis or time.time() - kayit[0] < GELECEK_TAZELE_SN)
-        lead.text = 'Sonuçlar (FotMob)' if gecmis else 'Maç programı (FotMob)'
+        self.lead.text = 'Sonuçlar (FotMob)' if gecmis else 'Maç programı (FotMob)'
         if not taze:
-            ozet.content = ''
+            self.ozet.content = ''
             govde.clear()
             with govde, ui.row().classes('items-center gap-2'):
                 ui.spinner(size='sm')
@@ -173,57 +202,50 @@ def kur(G):
                         ui.label(f'Maçlar alınamadı: {hata_metni(ex, "günün maçları")}').classes('lead')
                 return
             kayit = (time.time(), maclar, False)
-            onbellek[anahtar] = kayit
+            self.onbellek[anahtar] = kayit
         if istek != d['istek']:
             return
-        maclari_ciz(kayit[1])
+        self.maclari_ciz(kayit[1])
         if not kayit[2] and kayit[1]:  # hakem ve maçın stadyumu (her maç için ayrı istek; önbelleğe alınır)
-            lead.text += ' · hakem ve stadyum bilgisi yükleniyor…'
+            self.lead.text += ' · hakem ve stadyum bilgisi yükleniyor…'
             try:
                 ayrintili = await run.io_bound(gunun_maclari, anahtar, stadyumlar=G.depo.stadyumlar(), ham=G.depo.g.ham)
             except Exception:
                 logger.warning('hakem ve stadyum bilgisi alınamadı: %s', anahtar, exc_info=True)
                 return
-            onbellek[anahtar] = (time.time(), ayrintili, True)
+            self.onbellek[anahtar] = (time.time(), ayrintili, True)
             if istek == d['istek']:
-                lead.text = 'Sonuçlar (FotMob)' if gecmis else 'Maç programı (FotMob)'
-                maclari_ciz(ayrintili)
+                self.lead.text = 'Sonuçlar (FotMob)' if gecmis else 'Maç programı (FotMob)'
+                self.maclari_ciz(ayrintili)
 
     # ---------------------------------------------------------------- çizim
-    async def olasiliklari_guncelle(ms, yakinda):
+    async def olasiliklari_guncelle(self, ms, yakinda):
         """Maçların olasılıkları arka planda (ligin sezonu ilk kez kuruluyorsa birkaç saniye); değiştiyse yeniden çizilir."""
         try:
-            olas = await run.io_bound(G.depo.mac_olasiliklari, ms) or {}
+            olas = await run.io_bound(self.G.depo.mac_olasiliklari, ms) or {}
         except Exception:
             logger.debug('maç olasılıkları hesaplanamadı', exc_info=True)
             return
-        if d['maclar'] is ms and olas != d['olas']:
-            d['olas'] = olas
-            maclari_ciz(ms, yakinda, hesapla=False)
+        if self.d['maclar'] is ms and olas != self.d['olas']:
+            self.d['olas'] = olas
+            self.maclari_ciz(ms, yakinda, hesapla=False)
 
-    def maclari_ciz(ms, yakinda=None, hesapla=True):
+    def maclari_ciz(self, ms, yakinda=None, hesapla=True):
+        d = self.d
         d['maclar'], d['yakinda'] = ms, yakinda
         if hesapla and ms:
-            G.arka_plan(olasiliklari_guncelle(ms, yakinda))
-        sayi = {k: sum(1 for m in ms if m['durum'] == k) for k in ('canli', 'bitti', 'baslamadi')}
-        parca = [f'<b>{len(ms)}</b> maç']
-        if sayi['canli']:
-            parca.append(f'<span class="canli-yazi"><i class="nabiz"></i>{sayi["canli"]} canlı</span>')
-        if sayi['bitti']:
-            parca.append(f'{sayi["bitti"]} bitti')
-        if sayi['baslamadi']:
-            parca.append(f'{sayi["baslamadi"]} başlamadı')
-        ozet.content = ' · '.join(parca) if ms else ''
-        suzgec_boya(ms)
+            self.G.arka_plan(self.olasiliklari_guncelle(ms, yakinda))
+        self.ozet.content = _ozet_html(ms)
+        self.suzgec_boya(ms)
         secili = [m for m in ms if _uygun(m, d['suzgec'])]
-        govde.clear()
-        with govde:
+        self.govde.clear()
+        with self.govde:
             if not ms:
                 with ui.column().classes('panel'):
                     ui.label('Bu tarihte takip edilen liglerde ve milli turnuvalarda maç yok.').classes('lead')
                 if yakinda:
-                    _lig_paneli('Önümüzdeki günler', '', [{**m, 'durum': 'baslamadi'} for m in
-                                                          sorted(yakinda, key=lambda m: m.get('baslangic') or '')[:30]], tarihli=True)
+                    self.lig_paneli('Önümüzdeki günler', '', [{**m, 'durum': 'baslamadi'} for m in
+                                                              sorted(yakinda, key=lambda m: m.get('baslangic') or '')[:30]], tarihli=True)
                 return
             if not secili:
                 with ui.column().classes('panel'):
@@ -231,9 +253,10 @@ def kur(G):
                 return
             for k in dict.fromkeys(m['lig'] for m in secili):
                 lm = [m for m in secili if m['lig'] == k]
-                _lig_paneli(lm[0].get('baslik') or LIG_ADI.get(k, k), _lig_logo(k), lm)
+                self.lig_paneli(lm[0].get('baslik') or LIG_ADI.get(k, k), _lig_logo(k), lm)
 
-    def _lig_paneli(ad, logo, lm, tarihli=False):
+    def lig_paneli(self, ad, logo, lm, tarihli=False):
+        G = self.G
         cs = sum(1 for m in lm if m['durum'] == 'canli')
         rozet_html = (f'<span class="canli-rozet"><i class="nabiz"></i>{cs} canlı</span>' if cs
                       else f'<span class="cap">{len(lm)} maç</span>')
@@ -241,23 +264,24 @@ def kur(G):
             ui.html(f'<div class="lig-baslik">{_logo(logo, "lig-logo")}<span class="disp">{e(ad)}</span>{rozet_html}</div>',
                     sanitize=False).classes('w-full')
             for m in lm:  # maça tıklanınca maç kartı (olaylar, istatistikler, kadrolar); olasılık satırına: maç tahmini
-                ui.html(_satir({**m, '_olas': d['olas'].get(m.get('id'))}, tarihli), sanitize=False).classes('w-full').on(
+                ui.html(_satir({**m, '_olas': self.d['olas'].get(m.get('id'))}, tarihli), sanitize=False).classes('w-full').on(
                     'click', lambda ev, m=m: tahmine_git(G, m) if ev.args == 'tahmin' else G.mac_ac(m),
                     js_handler='(e) => emit(e.target.closest("[data-tahmin]") ? "tahmin" : "kart")')
 
-    def zaman_kontrol():
+    def zaman_kontrol(self):
         """Gece yarısını geçince 'bugün'e bakan görünüm yeni güne geçsin; bugünde "x dk önce" yazısı tazelensin."""
+        d = self.d
         bugun = date.today()
         if d['son_bugun'] != bugun:
             if d['gun'] == d['son_bugun']:
-                gun_degistir(bugun)
+                self.gun_degistir(bugun)
             d['son_bugun'] = bugun
         if d['gun'] == bugun:
-            ciz()
+            self.ciz()
 
-    G.dinle('canli', ciz)
-    ui.timer(30, zaman_kontrol)
-    gun_degistir(date.today())
+
+def kur(G):
+    _Canli(G)
     return lambda: None  # sezon değişince yapılacak bir şey yok
 
 

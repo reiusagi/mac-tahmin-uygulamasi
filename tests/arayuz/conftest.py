@@ -140,7 +140,7 @@ class Yardimci:
         return self.metin(self.panel(sekme_id))
 
     def alt_baslik(self):
-        return next((e.text for e in self.ogeler(ui.label) if re.search(r'\(.+\) · \d{4}/\d{2}', e.text or '')), '')
+        return next((e.text for e in self.ogeler(ui.label) if 'alt-baslik' in e._markers), '')  # sayfa.py: .mark('alt-baslik')
 
     async def bekle(self, kosul, sn=30, ne='koşul'):
         """kosul() doğru olana kadar bekler (asenkron arka plan işleri için); olmazsa AssertionError."""

@@ -117,102 +117,144 @@ def _yedek_html(takim, baslik):
             + f'<div class="cap">Yedekler: {yedek}</div></div>')
 
 
-def kur(G):
-    d = {'mac': None, 'istek': 0, 'veri': None}
-    with ui.dialog() as kart, ui.card().classes('w-full gap-3 mac-kart').style('max-width:820px;background:var(--panel);color:var(--ink)'):
-        with ui.row().classes('w-full items-center no-wrap'):
-            baslik = ui.label().classes('cap grow')
-            ui.button('Maç tahmini', icon='insights', on_click=lambda: tahmine()).props('flat dense no-caps color=primary').tooltip(
-                'Bu maçın tahminini aç (lig maçında Maç tahmini sekmesi; kupa ve milli maçta ilgili sekme)')
-            ui.button(icon='close', on_click=kart.close).props('flat round dense')
-        ust = takim_tiklama(ui.html('', sanitize=False).classes('w-full'), G)
-        hava_yer = ui.html('', sanitize=False).classes('w-full').style('text-align:center;font-size:.85rem')
-        with ui.tabs().props('dense no-caps active-color=primary indicator-color=primary align=justify').classes('w-full') as sekme:
-            ui.tab('olay', 'Olaylar')
-            ui.tab('ist', 'İstatistikler')
-            ui.tab('kadro', 'Kadrolar')
-        with ui.tab_panels(sekme, value='olay').props('animated=false').classes('w-full').style('background:transparent'):
-            with ui.tab_panel('olay'):
-                olay = ui.html('', sanitize=False).classes('w-full')
-            with ui.tab_panel('ist'):
-                ist = ui.html('', sanitize=False).classes('w-full')
-            with ui.tab_panel('kadro'):
-                kadro_not = ui.label().classes('cap')
-                kadro = ui.html('', sanitize=False).classes('w-full')
-        alt = ui.label().classes('cap')
+def _logo(tid):
+    return logo_html(takim_logo_url(tid, 'small'), 'mk-logo')
+
+
+def _uygulamadaki_kayit(depo, fm_id):
+    """Oyuncunun uygulamadaki en yeni lig-sezon kaydı (FotMob id'siyle): (lig, yıl, id) ya da None."""
+    try:
+        from ..sezon import _kariyer_dizini
+        satirlar = _kariyer_dizini(depo.veri_klasoru)['fm'].get(int(fm_id)) or []
+    except Exception:
+        logger.debug('oyuncunun uygulamadaki kaydı bulunamadı: %s', fm_id, exc_info=True)
+        return None
+    r = max(satirlar, key=lambda r: r['yil'], default=None)
+    return (r['anahtar'], r['yil'], r['id']) if r else None
+
+
+def _perf_ust_html(a, o, pid):
+    puan = o.get('puan')
+    renk = '' if not puan else 'iyi' if puan >= 7 else 'kotu' if puan < 6 else ''
+    isaret = next((_isaretler(p.get('olaylar')) for t in ('ev', 'dep') for p in (a.get('kadro') or {}).get(t, {}).get('ilk11', [])
+                   + (a.get('kadro') or {}).get(t, {}).get('yedek', []) if str(p.get('id')) == pid), '')
+    return (
+        f'<div class="tk-baslik">{_logo(o["takim_id"])}<div>'
+        f'<div class="disp" style="font-size:1.7rem;font-weight:700;line-height:1.1">{e(o["ad"])}{isaret}</div>'
+        f'<div class="cap">{e(turkce(o["takim"]))}' +(f' · {e(o["no"])} numara' if o['no'] else '') + (' · kaleci' if o['kaleci'] else '')
+        + (f' · {o["dk"]} dakika' if o.get('dk') is not None else '')
+        + f' · {e(a["ev"]["ad"])} {a["ev"]["skor"] if a["ev"]["skor"] is not None else ""} – '
+          f'{a["dep"]["skor"] if a["dep"]["skor"] is not None else ""} {e(a["dep"]["ad"])}</div></div>'
+        + (f'<span class="perf-puan {renk}">{_yaz(round(puan, 1))}</span>' if puan else '') + '</div>')
+
+
+def _perf_govde_html(o):
+    tur = {'RightFoot': 'sağ ayak', 'LeftFoot': 'sol ayak', 'Header': 'kafa', 'OtherBodyParts': 'diğer'}
+    sonuc = {'Goal': 'Gol', 'AttemptSaved': 'Kurtarıldı', 'Miss': 'Dışarı', 'Post': 'Direk', 'Blocked': 'Engellendi'}
+    sutlar = ''
+    if o['sutlar']:
+        sutlar = ('<div class="perf-grup"><div class="perf-baslik">Şutlar</div>' + ''.join(
+            f'<div class="perf-satir"><span>{s["dk"]}\' · {sonuc.get(s["sonuc"], s["sonuc"] or "")}'
+            f'{" (" + tur[s["tur"]] + ")" if s.get("tur") in tur else ""}</span>'
+            f'<b>xG {_yaz(round(s["xg"], 2)) if s.get("xg") is not None else "–"}</b></div>' for s in o['sutlar']) + '</div>')
+    return '<div class="perf-izgara">' + ''.join(
+        f'<div class="perf-grup"><div class="perf-baslik">{e(g)}</div>'
+        + ''.join(f'<div class="perf-satir"><span>{e(ad)}</span><b>{e(v)}</b></div>' for ad, v in satirlar) + '</div>'
+        for g, satirlar in o['gruplar']) + sutlar + '</div>'
+
+
+def _ust_html(a, durum, skor):
+    """Maç kartının üstü: takımlar (tıklanınca takım sayfası), skor ya da saat ve durum."""
+    return (  # takıma tıklanınca takım sayfası (milli takımlarda FotMob'un takım sayfası da var)
+        f'<div class="mk-ust"><div class="mk-takim" data-takim="{e(a["ev"]["id"])}" title="Takım sayfası">{_logo(a["ev"]["id"])}'
+        f'<b>{e(a["ev"]["ad"])}</b></div>'
+        f'<div class="mk-orta"><div class="mk-skor{" canli" if a["durum"] == "canli" else ""}">{skor}</div>{durum}</div>'
+        f'<div class="mk-takim" data-takim="{e(a["dep"]["id"])}" title="Takım sayfası">{_logo(a["dep"]["id"])}'
+        f'<b>{e(a["dep"]["ad"])}</b></div></div>')
+
+
+class _MacKarti:
+    """Maç kartı penceresi (olaylar, istatistikler, kadrolar) ve oyuncunun maçtaki performansı penceresi. d['istek']: eski
+    maçın geç gelen verisi yenisinin üstüne yazılmasın."""
+
+    def __init__(self, G):
+        self.G = G
+        self.d = {'mac': None, 'istek': 0, 'veri': None}
+        self._iskelet_kart()
+        self._iskelet_perf()
+        self.kadro.on('click', self.oyuncu_tiklandi,
+                      js_handler='(e) => { const t = e.target.closest("[data-oyuncu]"); if (t) emit(t.dataset.oyuncu); }')
+        ui.timer(YENILEME_SN, self.tazele)
+        self.kart.on('hide', lambda: self.d.update(mac=None, veri=None))
+
+    # ---------------------------------------------------------------- arayüz iskeleti
+    def _iskelet_kart(self):
+        with ui.dialog() as self.kart, ui.card().classes('w-full gap-3 mac-kart').style(
+                'max-width:820px;background:var(--panel);color:var(--ink)'):
+            with ui.row().classes('w-full items-center no-wrap'):
+                self.baslik = ui.label().classes('cap grow')
+                ui.button('Maç tahmini', icon='insights', on_click=lambda: self.tahmine()).props(
+                    'flat dense no-caps color=primary').tooltip(
+                    'Bu maçın tahminini aç (lig maçında Maç tahmini sekmesi; kupa ve milli maçta ilgili sekme)')
+                ui.button(icon='close', on_click=self.kart.close).props('flat round dense')
+            self.ust = takim_tiklama(ui.html('', sanitize=False).classes('w-full'), self.G)
+            self.hava_yer = ui.html('', sanitize=False).classes('w-full').style('text-align:center;font-size:.85rem')
+            with ui.tabs().props('dense no-caps active-color=primary indicator-color=primary align=justify').classes(
+                    'w-full') as self.sekme:
+                ui.tab('olay', 'Olaylar')
+                ui.tab('ist', 'İstatistikler')
+                ui.tab('kadro', 'Kadrolar')
+            with ui.tab_panels(self.sekme, value='olay').props('animated=false').classes('w-full').style(
+                    'background:transparent'):
+                with ui.tab_panel('olay'):
+                    self.olay = ui.html('', sanitize=False).classes('w-full')
+                with ui.tab_panel('ist'):
+                    self.ist = ui.html('', sanitize=False).classes('w-full')
+                with ui.tab_panel('kadro'):
+                    self.kadro_not = ui.label().classes('cap')
+                    self.kadro = ui.html('', sanitize=False).classes('w-full')
+            self.alt = ui.label().classes('cap')
+
+    def _iskelet_perf(self):
+        # oyuncunun maçtaki performansı
+        with ui.dialog() as self.perf, ui.card().classes('w-full gap-2').style(
+                'max-width:720px;background:var(--panel);color:var(--ink)'):
+            with ui.row().classes('w-full items-start no-wrap'):
+                self.perf_ust = ui.html('', sanitize=False).classes('grow')
+                self.perf_kart = ui.button('Oyuncu kartı', icon='badge', on_click=lambda: self.oyuncu_karti_ac()).props(
+                    'flat dense no-caps color=primary').tooltip('Oyuncunun sezon kartı (uygulamadaki liginde)')
+                ui.button(icon='close', on_click=self.perf.close).props('flat round dense')
+            self.perf_govde = ui.html('', sanitize=False).classes('w-full')
+            ui.label('Kaynak: FotMob. Canlı maçta kart açıkken 30 saniyede bir güncellenir.').classes('cap')
 
     # ---------------------------------------------------------------- oyuncunun maçtaki performansı
-    with ui.dialog() as perf, ui.card().classes('w-full gap-2').style('max-width:720px;background:var(--panel);color:var(--ink)'):
-        with ui.row().classes('w-full items-start no-wrap'):
-            perf_ust = ui.html('', sanitize=False).classes('grow')
-            perf_kart = ui.button('Oyuncu kartı', icon='badge', on_click=lambda: oyuncu_karti_ac()).props(
-                'flat dense no-caps color=primary').tooltip('Oyuncunun sezon kartı (uygulamadaki liginde)')
-            ui.button(icon='close', on_click=perf.close).props('flat round dense')
-        perf_govde = ui.html('', sanitize=False).classes('w-full')
-        ui.label('Kaynak: FotMob. Canlı maçta kart açıkken 30 saniyede bir güncellenir.').classes('cap')
-
-    def oyuncu_tiklandi(ev):
+    def oyuncu_tiklandi(self, ev):
         pid = str(ev.args or '')
-        if d['veri'] and pid in (d['veri'].get('oyuncular') or {}):
-            d['perf'] = pid
-            perf_ciz()
-            perf.open()
+        if self.d['veri'] and pid in (self.d['veri'].get('oyuncular') or {}):
+            self.d['perf'] = pid
+            self.perf_ciz()
+            self.perf.open()
         else:
             ui.notify('Bu oyuncu için maç istatistiği yok (oyuna girmemiş ya da kaynak vermiyor).')
 
-    kadro.on('click', oyuncu_tiklandi,
-             js_handler='(e) => { const t = e.target.closest("[data-oyuncu]"); if (t) emit(t.dataset.oyuncu); }')
-
-    def perf_ciz():
-        a, pid = d['veri'], d.get('perf')
+    def perf_ciz(self):
+        a, pid = self.d['veri'], self.d.get('perf')
         o = (a or {}).get('oyuncular', {}).get(pid)
         if not o:
             return
-        puan = o.get('puan')
-        renk = '' if not puan else 'iyi' if puan >= 7 else 'kotu' if puan < 6 else ''
-        isaret = next((_isaretler(p.get('olaylar')) for t in ('ev', 'dep') for p in (a.get('kadro') or {}).get(t, {}).get('ilk11', [])
-                       + (a.get('kadro') or {}).get(t, {}).get('yedek', []) if str(p.get('id')) == pid), '')
-        perf_ust.content = (
-            f'<div class="tk-baslik">{_logo(o["takim_id"])}<div>'
-            f'<div class="disp" style="font-size:1.7rem;font-weight:700;line-height:1.1">{e(o["ad"])}{isaret}</div>'
-            f'<div class="cap">{e(turkce(o["takim"]))}' +(f' · {e(o["no"])} numara' if o['no'] else '') + (' · kaleci' if o['kaleci'] else '')
-            + (f' · {o["dk"]} dakika' if o.get('dk') is not None else '')
-            + f' · {e(a["ev"]["ad"])} {a["ev"]["skor"] if a["ev"]["skor"] is not None else ""} – '
-              f'{a["dep"]["skor"] if a["dep"]["skor"] is not None else ""} {e(a["dep"]["ad"])}</div></div>'
-            + (f'<span class="perf-puan {renk}">{_yaz(round(puan, 1))}</span>' if puan else '') + '</div>')
-        tur = {'RightFoot': 'sağ ayak', 'LeftFoot': 'sol ayak', 'Header': 'kafa', 'OtherBodyParts': 'diğer'}
-        sonuc = {'Goal': 'Gol', 'AttemptSaved': 'Kurtarıldı', 'Miss': 'Dışarı', 'Post': 'Direk', 'Blocked': 'Engellendi'}
-        sutlar = ''
-        if o['sutlar']:
-            sutlar = ('<div class="perf-grup"><div class="perf-baslik">Şutlar</div>' + ''.join(
-                f'<div class="perf-satir"><span>{s["dk"]}\' · {sonuc.get(s["sonuc"], s["sonuc"] or "")}'
-                f'{" (" + tur[s["tur"]] + ")" if s.get("tur") in tur else ""}</span>'
-                f'<b>xG {_yaz(round(s["xg"], 2)) if s.get("xg") is not None else "–"}</b></div>' for s in o['sutlar']) + '</div>')
-        perf_govde.content = '<div class="perf-izgara">' + ''.join(
-            f'<div class="perf-grup"><div class="perf-baslik">{e(g)}</div>'
-            + ''.join(f'<div class="perf-satir"><span>{e(ad)}</span><b>{e(v)}</b></div>' for ad, v in satirlar) + '</div>'
-            for g, satirlar in o['gruplar']) + sutlar + '</div>'
-        perf_kart.set_visibility(bool(uygulamadaki_kayit(pid)))
+        self.perf_ust.content = _perf_ust_html(a, o, pid)
+        self.perf_govde.content = _perf_govde_html(o)
+        self.perf_kart.set_visibility(bool(_uygulamadaki_kayit(self.G.depo, pid)))
 
-    def uygulamadaki_kayit(fm_id):
-        """Oyuncunun uygulamadaki en yeni lig-sezon kaydı (FotMob id'siyle): (lig, yıl, id) ya da None."""
-        try:
-            from ..sezon import _kariyer_dizini
-            satirlar = _kariyer_dizini(G.depo.veri_klasoru)['fm'].get(int(fm_id)) or []
-        except Exception:
-            logger.debug('oyuncunun uygulamadaki kaydı bulunamadı: %s', fm_id, exc_info=True)
-            return None
-        r = max(satirlar, key=lambda r: r['yil'], default=None)
-        return (r['anahtar'], r['yil'], r['id']) if r else None
-
-    def oyuncu_karti_ac():
-        k = uygulamadaki_kayit(d.get('perf'))
+    def oyuncu_karti_ac(self):
+        k = _uygulamadaki_kayit(self.G.depo, self.d.get('perf'))
         if k:
-            perf.close()
-            kart.close()
-            G.git(*k)
+            self.perf.close()
+            self.kart.close()
+            self.G.git(*k)
 
-    def ciz(a, m):
+    # ---------------------------------------------------------------- maç kartı
+    def ciz(self, a, m):
         z = yerel(a.get('baslangic') or m.get('baslangic'))
         if a['durum'] == 'canli':
             durum = f'<span class="durum canli"><i class="nabiz"></i>{e(a.get("dakika") or "Canlı")}</span>'
@@ -221,48 +263,41 @@ def kur(G):
         else:
             durum = f'<span class="durum">{kisa_gun(z.date()) + " · " + f"{z:%H:%M}" if z else ""}</span>'
         skor = (f'{a["ev"]["skor"]} – {a["dep"]["skor"]}' if a['durum'] in ('canli', 'bitti') else (f'{z:%H:%M}' if z else '–'))
-        ust.content = (  # takıma tıklanınca takım sayfası (milli takımlarda FotMob'un takım sayfası da var)
-            f'<div class="mk-ust"><div class="mk-takim" data-takim="{e(a["ev"]["id"])}" title="Takım sayfası">{_logo(a["ev"]["id"])}'
-            f'<b>{e(a["ev"]["ad"])}</b></div>'
-            f'<div class="mk-orta"><div class="mk-skor{" canli" if a["durum"] == "canli" else ""}">{skor}</div>{durum}</div>'
-            f'<div class="mk-takim" data-takim="{e(a["dep"]["id"])}" title="Takım sayfası">{_logo(a["dep"]["id"])}'
-            f'<b>{e(a["dep"]["ad"])}</b></div></div>')
-        olay.content = _olay_html(a['olaylar'], a['durum'])
-        ist.content = _istatistik_html(a['istatistik'], a['ev']['ad'], a['dep']['ad'])
+        self.ust.content = _ust_html(a, durum, skor)
+        self.olay.content = _olay_html(a['olaylar'], a['durum'])
+        self.ist.content = _istatistik_html(a['istatistik'], a['ev']['ad'], a['dep']['ad'])
         k = a.get('kadro')
         if k and k['ev']['ilk11']:
-            kadro_not.text = ('Tahmini ilk 11 (FotMob); maç saatine yakın açıklanan kadroyla değişebilir.' if k.get('tur') == 'predicted'
-                              else 'İlk 11\'ler. Formanın köşesindeki sayı oyuncunun maç puanı (FotMob). Oyuncuya tıklayınca '
-                                   'bu maçtaki istatistikleri (pas, orta, şut, ikili mücadele…) açılır.')
-            kadro.content = (_saha_html(k) + '<div class="kadro-alt">' + _yedek_html(k['dep'], a['dep']['ad'])
-                             + _yedek_html(k['ev'], a['ev']['ad']) + '</div>')
+            self.kadro_not.text = ('Tahmini ilk 11 (FotMob); maç saatine yakın açıklanan kadroyla değişebilir.' if k.get('tur') == 'predicted'
+                                   else 'İlk 11\'ler. Formanın köşesindeki sayı oyuncunun maç puanı (FotMob). Oyuncuya tıklayınca '
+                                        'bu maçtaki istatistikleri (pas, orta, şut, ikili mücadele…) açılır.')
+            self.kadro.content = (_saha_html(k) + '<div class="kadro-alt">' + _yedek_html(k['dep'], a['dep']['ad'])
+                                  + _yedek_html(k['ev'], a['ev']['ad']) + '</div>')
         else:
-            kadro_not.text = 'Kadro henüz açıklanmadı; FotMob bu maç için tahmini kadro da yayınlamamış.'
-            kadro.content = ''
-        alt.text = ('Canlı: 30 saniyede bir yenilenir. ' if a['durum'] == 'canli' else '') + 'Kaynak: FotMob.'
-        if perf.value:  # açık oyuncu performansı da güncellenir
-            perf_ciz()
+            self.kadro_not.text = 'Kadro henüz açıklanmadı; FotMob bu maç için tahmini kadro da yayınlamamış.'
+            self.kadro.content = ''
+        self.alt.text = ('Canlı: 30 saniyede bir yenilenir. ' if a['durum'] == 'canli' else '') + 'Kaynak: FotMob.'
+        if self.perf.value:  # açık oyuncu performansı da güncellenir
+            self.perf_ciz()
 
-    def _logo(tid):
-        return logo_html(takim_logo_url(tid, 'small'), 'mk-logo')
-
-    async def yukle(m, ilk=False):
+    async def yukle(self, m, ilk=False):
+        G, d = self.G, self.d
         d['istek'] += 1
         istek = d['istek']
         if ilk:
-            ust.content = '<div class="cap">Maç ayrıntısı alınıyor…</div>'
-            olay.content = ist.content = kadro.content = hava_yer.content = ''
-            kadro_not.text = alt.text = ''
+            self.ust.content = '<div class="cap">Maç ayrıntısı alınıyor…</div>'
+            self.olay.content = self.ist.content = self.kadro.content = self.hava_yer.content = ''
+            self.kadro_not.text = self.alt.text = ''
         try:
             a = await run.io_bound(ayrinti, m['id'], G.depo.g.ham)
         except Exception as ex:
             if istek == d['istek'] and ilk:
-                ust.content = f'<div class="cap">Maç ayrıntısı alınamadı: {e(hata_metni(ex, "maç ayrıntısı"))}</div>'
+                self.ust.content = f'<div class="cap">Maç ayrıntısı alınamadı: {e(hata_metni(ex, "maç ayrıntısı"))}</div>'
             return
         if istek != d['istek'] or d['mac'] is not m:
             return
         d['veri'] = a
-        ciz(a, m)
+        self.ciz(a, m)
         if a['durum'] in ('baslamadi', 'canli'):  # maç saatindeki hava tahmini (yalnızca bilgi)
             try:
                 hv = await run.io_bound(hava.mac_havasi, G.depo.mac_konumu(m, a['ev'].get('id')),
@@ -271,32 +306,33 @@ def kur(G):
                 logger.debug('maç havası alınamadı', exc_info=True)
                 hv = None
             if istek == d['istek'] and d['mac'] is m:
-                hava_yer.content = hava_html(hv)
+                self.hava_yer.content = hava_html(hv)
         else:
-            hava_yer.content = ''
+            self.hava_yer.content = ''
 
-    def tahmine():
-        m = d['mac']
-        if m and tahmine_git(G, m):
-            kart.close()
+    def tahmine(self):
+        m = self.d['mac']
+        if m and tahmine_git(self.G, m):
+            self.kart.close()
 
-    async def ac(m):
+    async def ac(self, m):
         if not m.get('id'):
             return
-        d['mac'] = m
+        self.d['mac'] = m
         b, grup = m.get('baslik') or '', m.get('grup') or ''
         lig = re.match(r'([A-D]) Ligi · (.+)', grup)
         if lig and b.endswith(' ' + lig.group(1)):  # "Uluslar Ligi A · A Ligi · 1. Grup" → "Uluslar Ligi A · 1. Grup"
             grup = lig.group(2)
-        baslik.text = ' · '.join(x for x in (b, grup) if x)
-        sekme.set_value('olay' if m['durum'] in ('canli', 'bitti') else 'kadro')
-        kart.open()
-        await yukle(m, ilk=True)
+        self.baslik.text = ' · '.join(x for x in (b, grup) if x)
+        self.sekme.set_value('olay' if m['durum'] in ('canli', 'bitti') else 'kadro')
+        self.kart.open()
+        await self.yukle(m, ilk=True)
 
-    async def tazele():
-        if kart.value and d['mac'] and d['veri'] and d['veri']['durum'] == 'canli':
-            await yukle(d['mac'])
+    async def tazele(self):
+        d = self.d
+        if self.kart.value and d['mac'] and d['veri'] and d['veri']['durum'] == 'canli':
+            await self.yukle(d['mac'])
 
-    ui.timer(YENILEME_SN, tazele)
-    kart.on('hide', lambda: d.update(mac=None, veri=None))
-    return ac
+
+def kur(G):
+    return _MacKarti(G).ac

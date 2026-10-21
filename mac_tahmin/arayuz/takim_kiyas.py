@@ -16,6 +16,44 @@ def _para(x):
     return para(x, '–', yalniz_m=True)
 
 
+def sahadaki_yas(S, i):
+    """Takımın bu sezon ligde sahaya çıkan oyuncularının dakikaya göre ağırlıklı yaş ortalaması."""
+    oy = [p for p in S.PLY if S.T[i] in p['t'].split(' / ') and p.get('yas') and p['min'] > 0]
+    dk = sum(p['min'] for p in oy)
+    return sum(p['yas'] * p['min'] for p in oy) / dk if dk else None
+
+
+def olcutler(S, a, b, xp):
+    """Kıyas satırları: (başlık, A'nın değeri, B'nin değeri, biçim, yüksek mi iyi). xp: hak_edilen_puan sonucu (ya da None)."""
+    ra, rb = S.tb[a], S.tb[b]
+    mac = lambda r: r['O'] or 1  # noqa: E731
+    fm = form(S)
+    fz = {r['i']: r for r in fikstur_zorlugu(S)} if S.yil == SON_SEZON and S.U else {}
+    xp = xp or {}
+    satir = [
+        ('Puan (maç başına)', ra['P'] / mac(ra), rb['P'] / mac(rb), 2, True),
+        ('Attığı gol (maç başına)', ra['AG'] / mac(ra), rb['AG'] / mac(rb), 2, True),
+        ('Yediği gol (maç başına)', ra['YG'] / mac(ra), rb['YG'] / mac(rb), 2, False),
+    ]
+    if S.xg_var:
+        satir += [('xG (maç başına)', ra['xG'] / mac(ra), rb['xG'] / mac(rb), 2, True),
+                  ('Verdiği xG (maç başına)', ra['xGA'] / mac(ra), rb['xGA'] / mac(rb), 2, False)]
+    if S.T[a] in xp and S.T[b] in xp:
+        xa, xb = xp[S.T[a]], xp[S.T[b]]
+        satir.append(('Hak edilen puan (maç başına)', xa['xP'] / xa['mac'], xb['xP'] / xb['mac'], 2, True))
+    satir += [('Elo puanı', S.elo[a], S.elo[b], 0, True),
+              ('Form (son 5 maç puanı)', sum(FORM_PUAN[x] for x in fm[a]), sum(FORM_PUAN[x] for x in fm[b]), 0, True)]
+    if S.kadro_degeri:
+        satir.append(('Kadro değeri', S.kadro_degeri[a], S.kadro_degeri[b], 'para', True))
+    ya, yb = sahadaki_yas(S, a), sahadaki_yas(S, b)
+    if ya and yb:
+        satir.append(('Sahadaki yaş ortalaması', ya, yb, 1, None))  # iyisi yok: bilgi
+    if a in fz and b in fz:
+        satir.append((f'Fikstür zorluğu: sıradaki {FIKSTUR_SONRAKI} maç', fz[a]['zorluk5'], fz[b]['zorluk5'], 0, False))
+        satir.append(('Fikstür zorluğu: kalan bütün maçlar', fz[a]['zorluk'], fz[b]['zorluk'], 0, False))
+    return satir
+
+
 def kur(G):
     d = {'S': None, 'xp': None}
     with ui.column().classes('panel'):
@@ -30,41 +68,6 @@ def kur(G):
         h2h = ui.label().classes('cap')
         notlar = ui.label().classes('cap')
 
-    def sahadaki_yas(S, i):
-        """Takımın bu sezon ligde sahaya çıkan oyuncularının dakikaya göre ağırlıklı yaş ortalaması."""
-        oy = [p for p in S.PLY if S.T[i] in p['t'].split(' / ') and p.get('yas') and p['min'] > 0]
-        dk = sum(p['min'] for p in oy)
-        return sum(p['yas'] * p['min'] for p in oy) / dk if dk else None
-
-    def olcutler(S, a, b):
-        ra, rb = S.tb[a], S.tb[b]
-        mac = lambda r: r['O'] or 1  # noqa: E731
-        fm = form(S)
-        fz = {r['i']: r for r in fikstur_zorlugu(S)} if S.yil == SON_SEZON and S.U else {}
-        xp = d['xp'] or {}
-        satir = [
-            ('Puan (maç başına)', ra['P'] / mac(ra), rb['P'] / mac(rb), 2, True),
-            ('Attığı gol (maç başına)', ra['AG'] / mac(ra), rb['AG'] / mac(rb), 2, True),
-            ('Yediği gol (maç başına)', ra['YG'] / mac(ra), rb['YG'] / mac(rb), 2, False),
-        ]
-        if S.xg_var:
-            satir += [('xG (maç başına)', ra['xG'] / mac(ra), rb['xG'] / mac(rb), 2, True),
-                      ('Verdiği xG (maç başına)', ra['xGA'] / mac(ra), rb['xGA'] / mac(rb), 2, False)]
-        if S.T[a] in xp and S.T[b] in xp:
-            xa, xb = xp[S.T[a]], xp[S.T[b]]
-            satir.append(('Hak edilen puan (maç başına)', xa['xP'] / xa['mac'], xb['xP'] / xb['mac'], 2, True))
-        satir += [('Elo puanı', S.elo[a], S.elo[b], 0, True),
-                  ('Form (son 5 maç puanı)', sum(FORM_PUAN[x] for x in fm[a]), sum(FORM_PUAN[x] for x in fm[b]), 0, True)]
-        if S.kadro_degeri:
-            satir.append(('Kadro değeri', S.kadro_degeri[a], S.kadro_degeri[b], 'para', True))
-        ya, yb = sahadaki_yas(S, a), sahadaki_yas(S, b)
-        if ya and yb:
-            satir.append(('Sahadaki yaş ortalaması', ya, yb, 1, None))  # iyisi yok: bilgi
-        if a in fz and b in fz:
-            satir.append((f'Fikstür zorluğu: sıradaki {FIKSTUR_SONRAKI} maç', fz[a]['zorluk5'], fz[b]['zorluk5'], 0, False))
-            satir.append(('Fikstür zorluğu: kalan bütün maçlar', fz[a]['zorluk'], fz[b]['zorluk'], 0, False))
-        return satir
-
     def ciz():
         S = d['S']
         a, b = a_sec.value, b_sec.value
@@ -72,7 +75,7 @@ def kur(G):
             tablo.content = ozet.content = ''
             return
         satirlar, skor = [], [0, 0]
-        for baslik, va, vb, bicim, yuksek_iyi in olcutler(S, a, b):
+        for baslik, va, vb, bicim, yuksek_iyi in olcutler(S, a, b, d['xp']):
             yaz = _para if bicim == 'para' else (lambda v: fmt(v, bicim))
             iyi_a = iyi_b = False
             if yuksek_iyi is not None and abs(va - vb) > 1e-9:

@@ -29,21 +29,48 @@ def _mac(m, tid):
             f'<span>{"" if m["evId"] == tid else "@ "}{takim_logo(rakip_id)} {e(rakip)}</span><span>{skor}</span></div>')
 
 
-def kur(G):
-    d = {'veri': {}}
-    with ui.column().classes('panel'):
-        with ui.row().classes('w-full items-center'):
-            ui.html('<h3>Takımlarım</h3>', sanitize=False)
-            ui.space()
-            ui.button('Deneme bildirimi gönder', icon='notifications_active', on_click=lambda: deneme()).props(
-                'flat dense no-caps').tooltip('Bildirimlerin nasıl göründüğünü görmek için (Windows bildirimi ve uygulama içi)')
-            ui.switch('Bildirimler', value=app.storage.general.get('bildirim', True),
-                      on_change=lambda ev: app.storage.general.__setitem__('bildirim', ev.value)).tooltip(
-                'Favori takımların maçlarında başlama, gol ve maç sonu bildirimi (Windows bildirimi ve uygulama içinde)')
-        bos = ui.label('Henüz takım eklemedin. Bir takımın adına tıkla, açılan takım sayfasında "Takımlarıma ekle"ye bas.').classes('lead')
-        canli = takim_tiklama(ui.html('', sanitize=False).classes('w-full'), G)
-        izgara = ui.element('div').classes('w-full').style(
-            'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px')
+def _takip_satirlari(depo):
+    """Takip edilenlerin güncel durumu (arka planda: sezonlar gerekirse kurulur, ağ isteği yok)."""
+    from ..sezon import SON_SEZON
+    out = []
+    for t in takip.liste():
+        fm = str(t['fm_id'])
+        g = takip.guncel_takim(fm)
+        lig = g[0] if g else t['lig']
+        p = None
+        try:
+            S = depo.sezon(lig, SON_SEZON)
+            p = next((q for q in S.PLY if str(q.get('fm_id')) == fm and not q.get('ayrildi')), None)
+        except Exception:
+            logger.debug('takip edilen oyuncunun sezonu kurulamadı: %s', lig, exc_info=True)
+        deger = depo.degerler_onbellek(lig).get(int(fm)) if fm.isdigit() else None
+        bitis = depo.sozlesmeler([fm], None, False).get(fm)
+        out.append({'t': t, 'takim': g[1] if g else (p['t'].split(' / ')[-1] if p else '–'), 'tid': g[2] if g else None,
+                    'lig': lig, 'p': p, 'deger': deger, 'bitis': bitis})
+    return out
+
+
+def _takip_satiri(i, r):
+    p = r['p']
+    sezon = f'{p["g"]} gol · {p["a"]} asist · {p["min"]} dk' if p else '–'
+    takim_html = takim_link(r['takim'], r['tid']) if r['tid'] else e(r['takim'])
+    bitis = f'{r["bitis"][5:7]}.{r["bitis"][:4]}' if r['bitis'] else '–'
+    return (f'<tr><td><span class="link" data-takip="ac:{i}">{e(r["t"]["ad"])}</span></td>'
+            f'<td class="takim-hucre">{takim_logo(r["tid"])}{takim_html}</td><td>{sezon}</td>'
+            f'<td>{para(r["deger"], "–")}</td><td>{bitis}</td>'
+            f'<td><span class="link cap" data-takip="cikar:{i}" title="Takipten çıkar">✕</span></td></tr>')
+
+
+def _canli_html(maclar):
+    return ('<div class="disp" style="font-weight:700;margin-bottom:4px">Şu an oynanan</div>' + ''.join(
+        f'<div class="tl-canli"><span class="durum canli"><i class="nabiz"></i>{e(m.get("dakika") or "Canlı")}</span> '
+        f'{takim_logo(m["evId"])} {takim_link(m["ev"], m["evId"])} <b>{m.get("evGol") or 0} – {m.get("depGol") or 0}</b> '
+        f'{takim_link(m["dep"], m["depId"])} {takim_logo(m["depId"])} <span class="cap">· {e(m.get("baslik") or "")}</span></div>'
+        for m in maclar)) if maclar else ''
+
+
+def _kur_sesler(G):
+    """Bildirim sesi paneli: genel ses, takımlara ayrı ses, kendi sesini ekleme. Döner: sesleri_ciz."""
     with ui.column().classes('panel'):
         ui.html('<h3>Bildirim sesi</h3>', sanitize=False)
         ui.label('Bildirimlerde çalınacak ses. Takımlarına ayrı ses seçebilirsin (seçmezsen genel ses çalar; takip ettiğin '
@@ -97,53 +124,28 @@ def kur(G):
         bildirim.ses_ayarla(ad)  # eklenen ses genel ses olur; takımlara ayrıca seçilebilir
         sesleri_ciz()
         ui.notify(f'"{ad}" eklendi ve genel bildirim sesi yapıldı.', type='positive')
+    return sesleri_ciz
 
+
+def _kur_takip(G):
+    """Takip ettiğim oyuncular paneli (oyuncu kartındaki "Takip et"). Döner: takip_ciz (async)."""
+    d = {}
     with ui.column().classes('panel'):
         ui.html('<h3>Takip ettiğim oyuncular</h3>', sanitize=False)
         ui.label('Oyuncu kartındaki "Takip et" ile eklenir. Gol ya da asist yaptığında (takımının maçı bittikten ~10 dakika '
                  'sonra), sözleşmesi son 6 aya girdiğinde ve piyasa değeri %10 ve üstü değiştiğinde bildirim gelir.').classes('cap')
         takip_kutu = ui.html('', sanitize=False).classes('w-full kaydir')
 
-    def takip_satirlari():
-        """Takip edilenlerin güncel durumu (arka planda: sezonlar gerekirse kurulur, ağ isteği yok)."""
-        from ..sezon import SON_SEZON
-        out = []
-        for t in takip.liste():
-            fm = str(t['fm_id'])
-            g = takip.guncel_takim(fm)
-            lig = g[0] if g else t['lig']
-            p = None
-            try:
-                S = G.depo.sezon(lig, SON_SEZON)
-                p = next((q for q in S.PLY if str(q.get('fm_id')) == fm and not q.get('ayrildi')), None)
-            except Exception:
-                logger.debug('takip edilen oyuncunun sezonu kurulamadı: %s', lig, exc_info=True)
-            deger = G.depo.degerler_onbellek(lig).get(int(fm)) if fm.isdigit() else None
-            bitis = G.depo.sozlesmeler([fm], None, False).get(fm)
-            out.append({'t': t, 'takim': g[1] if g else (p['t'].split(' / ')[-1] if p else '–'), 'tid': g[2] if g else None,
-                        'lig': lig, 'p': p, 'deger': deger, 'bitis': bitis})
-        return out
-
     async def takip_ciz():
         L = takip.liste()
         if not L:
             takip_kutu.content = '<p class="cap">Henüz oyuncu takip etmiyorsun.</p>'
             return
-        satirlar = await run.io_bound(takip_satirlari) or []
+        satirlar = await run.io_bound(_takip_satirlari, G.depo) or []
         d['takip'] = satirlar
-
-        def satir(i, r):
-            p = r['p']
-            sezon = f'{p["g"]} gol · {p["a"]} asist · {p["min"]} dk' if p else '–'
-            takim_html = takim_link(r['takim'], r['tid']) if r['tid'] else e(r['takim'])
-            bitis = f'{r["bitis"][5:7]}.{r["bitis"][:4]}' if r['bitis'] else '–'
-            return (f'<tr><td><span class="link" data-takip="ac:{i}">{e(r["t"]["ad"])}</span></td>'
-                    f'<td class="takim-hucre">{takim_logo(r["tid"])}{takim_html}</td><td>{sezon}</td>'
-                    f'<td>{para(r["deger"], "–")}</td><td>{bitis}</td>'
-                    f'<td><span class="link cap" data-takip="cikar:{i}" title="Takipten çıkar">✕</span></td></tr>')
         takip_kutu.content = ('<table class="tb"><thead><tr><th>Oyuncu</th><th>Takım</th><th>Bu sezon (lig)</th><th>Değer</th>'
                               '<th>Sözleşme bitişi</th><th></th></tr></thead><tbody>'
-                              + ''.join(satir(i, r) for i, r in enumerate(satirlar)) + '</tbody></table>')
+                              + ''.join(_takip_satiri(i, r) for i, r in enumerate(satirlar)) + '</tbody></table>')
 
     def takip_tiklandi(ev):
         """Oyuncu adı: kartı (güncel sezondaki kaydı, yoksa eklendiği sezon); ✕: takipten çıkar."""
@@ -165,6 +167,26 @@ def kur(G):
     takim_tiklama(takip_kutu, G)
     takip_kutu.on('click', takip_tiklandi,
                   js_handler='(e) => { const t = e.target.closest("[data-takip]"); if (t) { e.stopPropagation(); emit(t.dataset.takip); } }')
+    return takip_ciz
+
+
+def kur(G):
+    d = {'veri': {}}
+    with ui.column().classes('panel'):
+        with ui.row().classes('w-full items-center'):
+            ui.html('<h3>Takımlarım</h3>', sanitize=False)
+            ui.space()
+            ui.button('Deneme bildirimi gönder', icon='notifications_active', on_click=lambda: deneme()).props(
+                'flat dense no-caps').tooltip('Bildirimlerin nasıl göründüğünü görmek için (Windows bildirimi ve uygulama içi)')
+            ui.switch('Bildirimler', value=app.storage.general.get('bildirim', True),
+                      on_change=lambda ev: app.storage.general.__setitem__('bildirim', ev.value)).tooltip(
+                'Favori takımların maçlarında başlama, gol ve maç sonu bildirimi (Windows bildirimi ve uygulama içinde)')
+        bos = ui.label('Henüz takım eklemedin. Bir takımın adına tıkla, açılan takım sayfasında "Takımlarıma ekle"ye bas.').classes('lead')
+        canli = takim_tiklama(ui.html('', sanitize=False).classes('w-full'), G)
+        izgara = ui.element('div').classes('w-full').style(
+            'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px')
+    sesleri_ciz = _kur_sesler(G)
+    takip_ciz = _kur_takip(G)
 
     def deneme():
         favs = bildirim.favoriler()
@@ -177,11 +199,7 @@ def kur(G):
         fav = bildirim.favori_idler()
         c = G.depo.g.canli or {}
         maclar = [m for m in c.get('maclar') or [] if {str(m.get('evId')), str(m.get('depId'))} & fav and m.get('durum') == 'canli']
-        canli.content = ('<div class="disp" style="font-weight:700;margin-bottom:4px">Şu an oynanan</div>' + ''.join(
-            f'<div class="tl-canli"><span class="durum canli"><i class="nabiz"></i>{e(m.get("dakika") or "Canlı")}</span> '
-            f'{takim_logo(m["evId"])} {takim_link(m["ev"], m["evId"])} <b>{m.get("evGol") or 0} – {m.get("depGol") or 0}</b> '
-            f'{takim_link(m["dep"], m["depId"])} {takim_logo(m["depId"])} <span class="cap">· {e(m.get("baslik") or "")}</span></div>'
-            for m in maclar)) if maclar else ''
+        canli.content = _canli_html(maclar)
 
     def kart(f):
         tid = f['id']
