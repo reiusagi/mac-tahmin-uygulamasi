@@ -8,7 +8,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from nicegui import app
 
@@ -189,6 +189,91 @@ def _favori_takim(m, fav=None):
     return next((t for t in (m.get('evId'), m.get('depId')) if str(t) in fav), None)
 
 
+HATIRLATMA_SAAT = 3  # favori takımın maçına bu kadar saat kala tahmin girilmediyse hatırlatılır (Takımlarım'da ayarlanır; 0: kapalı)
+HATIRLATMA_KAYIT = 300  # hatırlatılan maç id'lerinden en çok bu kadarı saklanır (app.storage.general['hatirlatilan'])
+HATIRLATMA_ESLESME_SA = 36  # tahminin başlama zamanı maçınkinden en çok bu kadar saat farklıysa aynı maç sayılır (erteleme)
+
+
+def _simdi():
+    return datetime.now(timezone.utc)
+
+
+def _depo():
+    return app.storage.general
+
+
+def _zaman(s):
+    """ISO metni saat dilimli datetime'a (dilimsizse UTC); okunamazsa None."""
+    if not isinstance(s, str):
+        return None
+    try:
+        z = datetime.fromisoformat(s.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    return z if z.tzinfo else z.replace(tzinfo=timezone.utc)
+
+
+def hatirlatilacaklar(maclar, takip, tahminler, simdi, saat):
+    """Maçına en çok `saat` saat kalmış (başlamamış) favori takım maçlarından, Tahmin oyununda tahmini olmayanlar.
+    takip: favori takım id'leri; tahminler: [{'evId', 'depId', 'baslama' (ISO) ya da 'tarih'}] (tahmin_kimlikleri);
+    simdi: saat dilimli datetime. Aynı çiftin başka tarihli tahmini (sezonda 3-4 kez oynarlar) sayılmaz."""
+    if not saat or saat <= 0:
+        return []
+    takip = {str(t) for t in takip or ()}
+    girilmis = [((str(t.get('evId')), str(t.get('depId'))),
+                 _zaman(t.get('baslama')) or _zaman(f'{t["tarih"]}T12:00:00+00:00' if t.get('tarih') else None))
+                for t in tahminler or ()]
+    sinir = timedelta(hours=HATIRLATMA_ESLESME_SA)
+    out = []
+    for m in maclar or ():
+        bas = _zaman(m.get('baslangic'))
+        if bas is None or m.get('durum') != 'baslamadi' or not {str(m.get('evId')), str(m.get('depId'))} & takip:
+            continue
+        if not timedelta(0) < bas - simdi <= timedelta(hours=saat):
+            continue
+        cift = (str(m.get('evId')), str(m.get('depId')))
+        if not any(c == cift and z and abs(z - bas) <= sinir for c, z in girilmis):
+            out.append(m)
+    return out
+
+
+def hatirlatma_metni(m):
+    """(başlık, metin): "Galatasaray – Fenerbahçe 21:30'da başlıyor. Tahminini girmedin." (saat yerel)."""
+    bas = _zaman(m['baslangic']).astimezone()
+    return 'Tahmin hatırlatması', f'{m["ev"]} – {m["dep"]} {bas:%H:%M}\'da başlıyor. Tahminini girmedin.'
+
+
+def tahmin_kimlikleri(kayitlar, ligler):
+    """Tahmin oyunu kayıtlarını (takım adlarıyla) FotMob id'li hale getirir; ligler: stadyumlar()['ligler'] ({lig: {ad: id}}).
+    Adı ya da ligi bilinmeyen kayıt atlanır."""
+    out = []
+    for r in kayitlar.values():
+        idler = ligler.get(r.get('lig')) or {}
+        if r.get('ev') in idler and r.get('dep') in idler:
+            out.append({'evId': str(idler[r['ev']]), 'depId': str(idler[r['dep']]), 'baslama': r.get('baslama'),
+                        'tarih': r.get('tarih')})
+    return out
+
+
+def hatirlatma_kontrol(canli, fav):
+    """kontrol çağırır: favori takımın maçına HATIRLATMA_SAAT kala tahmin girilmediyse bir kez bildirir; gönderilenler
+    kalıcıdır (uygulama yeniden başlayınca tekrarlanmaz). Yalnızca Tahmin oyunundaki ligler."""
+    if DEPO is None:
+        return
+    depo = _depo()
+    ligler = DEPO.stadyumlar()['ligler']
+    maclar = [m for m in (canli.get('maclar') or []) + (canli.get('yakinda') or []) if m.get('lig') in ligler]
+    yapilan = list(depo.get('hatirlatilan') or [])
+    tahminler = tahmin_kimlikleri(depo.get('tahmin_oyunu') or {}, ligler)
+    saat = depo.get('hatirlatma_saat', HATIRLATMA_SAAT)
+    yeni = [m for m in hatirlatilacaklar(maclar, fav, tahminler, _simdi(), saat) if str(m['id']) not in yapilan]
+    if not yeni:
+        return
+    depo['hatirlatilan'] = (yapilan + [str(m['id']) for m in yeni])[-HATIRLATMA_KAYIT:]  # önce kaydet: iki kez gitmesin
+    for m in yeni:
+        gonder(*hatirlatma_metni(m), takim=_favori_takim(m, fav))
+
+
 def kontrol(canli):
     """Guncelleyici her yeni canlı skor verisinde çağırır."""
     fav = favori_idler()
@@ -197,6 +282,10 @@ def kontrol(canli):
             if {str(m.get('evId')), str(m.get('depId'))} & fav:
                 _ozet_kontrol(m)
                 _ilk11_kontrol(m, fav)
+        try:
+            hatirlatma_kontrol(canli, fav)
+        except Exception:
+            logger.warning('tahmin hatırlatması kontrol edilemedi', exc_info=True)
     from . import takip
     for m in canli.get('maclar') or []:
         simdi = (m.get('durum'), m.get('evGol'), m.get('depGol'))

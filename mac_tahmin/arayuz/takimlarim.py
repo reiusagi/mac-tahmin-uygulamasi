@@ -181,6 +181,12 @@ def kur(G):
             ui.switch('Bildirimler', value=app.storage.general.get('bildirim', True),
                       on_change=lambda ev: app.storage.general.__setitem__('bildirim', ev.value)).tooltip(
                 'Favori takımların maçlarında başlama, gol ve maç sonu bildirimi (Windows bildirimi ve uygulama içinde)')
+        with ui.row().classes('w-full items-center gap-2'):
+            ui.number('Tahmin hatırlatması (saat önce)', value=app.storage.general.get('hatirlatma_saat', bildirim.HATIRLATMA_SAAT),
+                      min=0, max=24, step=1, format='%d',
+                      on_change=lambda ev: app.storage.general.__setitem__('hatirlatma_saat', int(ev.value or 0))).props(
+                'outlined dense').style('width:230px').tooltip(
+                'Takımının maçına bu kadar saat kala Tahmin oyununda tahmin girmediysen bildirim gelir (0: kapalı)')
         bos = ui.label('Henüz takım eklemedin. Bir takımın adına tıkla, açılan takım sayfasında "Takımlarıma ekle"ye bas.').classes('lead')
         canli = takim_tiklama(ui.html('', sanitize=False).classes('w-full'), G)
         izgara = ui.element('div').classes('w-full').style(
