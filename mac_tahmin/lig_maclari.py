@@ -9,6 +9,7 @@ import threading
 import time
 from pathlib import Path
 
+from . import sema
 from .mac_ozeti import ayrinti
 from .sezon import FOTMOB_ID, SON_SEZON
 from .takim import VARSAYILAN_MEVKI, dizilise_yerlestir
@@ -73,6 +74,7 @@ def fikstur(lig, ham):
 
 def _fikstur_oku(yol):
     lg = json.loads(yol.read_text(encoding='utf-8'))
+    sema.kontrol('lig', lg)
     out = []
     for m in (lg.get('fixtures') or {}).get('allMatches') or []:
         st = m.get('status') or {}

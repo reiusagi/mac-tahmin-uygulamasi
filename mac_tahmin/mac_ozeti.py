@@ -6,6 +6,7 @@ import re
 import threading
 from pathlib import Path
 
+from . import sema
 from .ulkeler import turkce
 from .veri import fotmob_url, json_getir, kimlik
 
@@ -241,6 +242,7 @@ def ayrinti(mac_id, ham):
             _yaz(yol, eski)
             return eski
     j = json_getir(fotmob_url('matchDetails', matchId=mac_id))
+    sema.kontrol('mac', j)
     h = j.get('header') or {}
     st = h.get('status') or {}
     durum = ('iptal' if st.get('cancelled') else 'bitti' if st.get('finished') else 'canli' if st.get('started') else 'baslamadi')

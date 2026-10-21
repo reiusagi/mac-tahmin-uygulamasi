@@ -20,6 +20,7 @@ import urllib.request
 import zlib
 from pathlib import Path
 
+from . import sema
 from .sezon import FOTMOB_ID, LIGLER, SON_SEZON, TAKVIM_YILI
 
 UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -185,6 +186,7 @@ def fotmob_mevki_haritasi(anahtar, yil, ham, yenile=False):
     try:
         lg = onbellekli(Path(ham) / f'fm-{lid}-{yil}.json',
                         fotmob_url('leagues', id=lid, season=f'{yil}/{yil + 1}'), yenile=yenile)
+        sema.kontrol('lig', lg)
         if lg['details'].get('selectedSeason') != f'{yil}/{yil + 1}':
             return None
         giris = next((e for e in lg['stats'].get('players') or [] if e['name'] == 'mins_played'), None)
@@ -194,6 +196,7 @@ def fotmob_mevki_haritasi(anahtar, yil, ham, yenile=False):
         if not liste:
             return None
         x = onbellekli(Path(ham) / f'fm-{lid}-{yil}-mins_played.json', liste, yenile=yenile)
+        sema.kontrol('oyuncu_liste', x)
     except Exception:
         logger.warning('FotMob mevki haritası alınamadı: %s %s', anahtar, yil, exc_info=True)
         return None
@@ -264,6 +267,7 @@ def _id_mevki(anahtar, yil, ham, yenile=False):
                 j = onbellekli(Path(ham) / f'{anahtar}-{yil}.json',
                                f'https://understat.com/getLeagueData/{anahtar}/{yil}',
                                {'X-Requested-With': 'XMLHttpRequest'}, yenile)
+                sema.kontrol('understat', j)
                 fix = lambda s: html.unescape(str(s))
                 oy = [o for o in j['players'] if int(o['time']) > 0]
                 fm = understat_fotmob_mevki([(fix(o['player_name']), [fix(t) for t in o['team_title'].split(',')])
@@ -352,6 +356,7 @@ def understat_donustur(j, harita=None, onceki_mevki=None, dogumlar=None, fm_ek=N
 def understat_sezon(anahtar, yil, ham, yenile=False):
     j = onbellekli(Path(ham) / f'{anahtar}-{yil}.json', f'https://understat.com/getLeagueData/{anahtar}/{yil}',
                    {'X-Requested-With': 'XMLHttpRequest'}, yenile)
+    sema.kontrol('understat', j)
     from .dogum import dogum_oku, tamamla
     harita = fotmob_mevki_haritasi(anahtar, yil, ham, yenile)
     onceki = None if harita else sonraki_sezon_mevkileri(yil, ham, yenile)
@@ -447,6 +452,7 @@ def _fotmob_liste(lg, ham, lig_id, yil, ad, kaynak, anahtar, yenile=False):
     if not url:
         return {}
     x = onbellekli(Path(ham) / f'fm-{lig_id}-{yil}-{ad}.json', url, yenile=yenile)
+    sema.kontrol('oyuncu_liste' if kaynak == 'players' else 'takim_liste', x)
     return {str(it[anahtar]): it for it in x['TopLists'][0]['StatList']}
 
 
@@ -482,6 +488,7 @@ def fotmob_ek_istatistikleri(anahtar, yil, ham, yenile=False):
     try:
         lg = onbellekli(Path(ham) / f'fm-{lid}-{yil}.json',
                         fotmob_url('leagues', id=lid, season=f'{yil}/{yil + 1}'), yenile=yenile)
+        sema.kontrol('lig', lg)
         if lg['details'].get('selectedSeason') != f'{yil}/{yil + 1}':
             return {}
         L = {ad: _fotmob_liste(lg, ham, lid, yil, ad, 'players', 'ParticiantId', yenile) for ad in LISTELER}
@@ -501,6 +508,7 @@ def fotmob_sezon(yil, ham, yenile=False, lig_id=71, takvim_yili=False):
     lg = onbellekli(ham / f'fm-{lig_id}-{yil}.json',
                     fotmob_url('leagues', id=lig_id, season=sezon),
                     yenile=yenile)
+    sema.kontrol('lig', lg)
     if lg['details'].get('selectedSeason') != sezon:  # FotMob olmayan sezon yerine güncel sezonu döndürebiliyor
         raise ValueError(f'FotMob {sezon} sezonunu vermedi ({lg["details"].get("selectedSeason")})')
     tid = {}

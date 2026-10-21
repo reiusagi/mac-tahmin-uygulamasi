@@ -154,6 +154,8 @@ def sayfa(depo):
         ui.space()
         veri_durum = ui.label()
         guncelle_dugme = ui.button('Şimdi güncelle', icon='refresh', on_click=lambda: simdi()).props('flat dense no-caps size=sm')
+        bicim_uyari = ui.label().classes('w-full').style('color:#e0a030')  # FotMob/Understat veri biçimi değiştiyse (sema.py)
+        bicim_uyari.set_visibility(False)
 
     kart_ac = oyuncu_karti.kur(G)
     G.oyuncu_ac = lambda idx: G.arka_plan(kart_ac(idx=idx))
@@ -321,6 +323,8 @@ def sayfa(depo):
         elif g.son_veri:
             veri_durum.text = f'Süren sezon verisi: {g.son_veri:%d.%m %H:%M} · {g.veri_saat:g} saatte bir kendini yeniler'
         guncelle_dugme.set_enabled(not g.veri_yenileniyor)
+        bicim_uyari.text = g.bicim_uyarisi()
+        bicim_uyari.set_visibility(bool(bicim_uyari.text))
         if g.veri_surum != izlenen['surum']:  # süren sezonun verisi yenilendi
             izlenen['surum'] = g.veri_surum
             # açık lig yalnızca kendi verisi değiştiyse yeniden kurulur (başka ligde biten maç ekranı yenilemez)

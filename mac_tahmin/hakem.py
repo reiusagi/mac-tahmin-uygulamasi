@@ -8,6 +8,7 @@ import logging
 import time
 from pathlib import Path
 
+from . import sema
 from .veri import BEKLEME, fotmob_url, json_getir, kimlik
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ def mac_detay(mac_id, ham):
         eski = {'hakem': None, 'stadyum': None}
     try:
         j = json_getir(fotmob_url('matchDetails', matchId=mac_id))
+        sema.kontrol('mac', j)
         time.sleep(BEKLEME)
     except Exception:
         logger.debug('maç detayı alınamadı: %s', mac_id, exc_info=True)

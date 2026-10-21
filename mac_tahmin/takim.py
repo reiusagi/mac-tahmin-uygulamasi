@@ -7,6 +7,7 @@ import logging
 import time
 from pathlib import Path
 
+from . import sema
 from .avrupa import ELEMELER, KUPA, KUPALAR
 from .milli import TURNUVA
 from .sezon import FOTMOB_ID, LIG_ADI as LIG_ANAHTAR_ADI, sadelestir
@@ -31,6 +32,7 @@ def _getir(tid, ham):
     if yol.exists() and time.time() - yol.stat().st_mtime < ONBELLEK_SN:
         return json.loads(yol.read_text(encoding='utf-8'))
     j = json_getir(fotmob_url('teams', id=tid))
+    sema.kontrol('takim', j)
     # yalnızca takim_sayfasi'nın okuduğu bölümler saklanır (tam yanıt ~0,5 MB; istatistik tabloları, haberler… gereksiz)
     ozet = j.get('overview') or {}
     j = {'details': j.get('details') or {}, 'fixtures': {'allFixtures': {'fixtures':
@@ -132,6 +134,7 @@ def _oyuncu_sayfasi(fm_id, ham):
         if 'careerHistory' in j and 'contractEnd' in j and 'degerler' in j:
             return j
     j = json_getir(fotmob_url('playerData', id=fm_id))
+    sema.kontrol('oyuncu', j)
     sutlar = ((j.get('firstSeasonStats') or {}).get('shotmap')) or []
     j = {'recentMatches': j.get('recentMatches') or [], 'careerHistory': j.get('careerHistory') or {},
          'contractEnd': ((j.get('contractEnd') or {}).get('utcTime') or '')[:10] or None,

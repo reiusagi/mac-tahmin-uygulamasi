@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
+from . import sema
 from .avrupa import KUPALAR, YEREL_KUPALAR, tur_adi
 from .milli import TURNUVALAR, grup_adi
 from .ulkeler import turkce
@@ -46,6 +47,7 @@ def gunun_maclari(tarih, saat_dilimi='Europe/Istanbul', stadyumlar=None, ham=Non
     from .hakem import mac_detay
     fm = (stadyumlar or {}).get('fotmob') or {}
     j = json_getir(fotmob_url('matches', date=tarih, timezone=saat_dilimi))
+    sema.kontrol('canli', j)
     maclar = []
     for lig in j.get('leagues', []):
         anahtar = FOTMOB_LIGLER.get(lig.get('primaryId'))

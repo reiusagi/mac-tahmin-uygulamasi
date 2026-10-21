@@ -11,6 +11,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from . import sema
 from .veri import fotmob_url, json_getir, kimlik
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ def _cek(pid):
     for deneme in range(3):
         try:
             p = json_getir(fotmob_url('playerData', id=pid))
+            sema.kontrol('oyuncu', p)
             return gecerli((p.get('birthDate') or {}).get('utcTime'))
         except Exception:
             logger.debug('doğum tarihi alınamadı: %s (deneme %d)', pid, deneme + 1, exc_info=True)

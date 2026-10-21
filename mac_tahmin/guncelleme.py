@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import avrupa, karne, lig_maclari, milli, veri
+from . import avrupa, karne, lig_maclari, milli, sema, veri
 from .canli import canli_skorlar
 from .sezon import LIGLER, SON_SEZON
 from .stadyum import stadyum_oku, stadyumlar_indir
@@ -75,6 +75,10 @@ class Guncelleyici:
             except Exception:
                 logger.warning('önbellek temizliği başarısız', exc_info=True)
             time.sleep(TEMIZLIK_SAAT * 3600)
+
+    def bicim_uyarisi(self):
+        """Dış kaynakların yanıt biçimi bozulmuş görünüyorsa alt bilgide gösterilecek kısa uyarı ('' = sorun yok)."""
+        return sema.uyari_metni()
 
     def simdi_guncelle(self):
         """Süren sezonun verisini beklemeden yeniler (arayüzdeki düğme). Son istekten SIMDI_ARALIK_SN geçmediyse

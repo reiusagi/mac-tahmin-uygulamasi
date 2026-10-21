@@ -9,6 +9,7 @@ import json
 import unicodedata
 from pathlib import Path
 
+from . import sema
 from .sezon import FOTMOB_ID as FOTMOB_LIG_ID, LIGLER, SON_SEZON
 from .veri import fotmob_url, onbellekli
 # Understat adı ile FotMob adı benzerlikle eşleşmeyen takımlar
@@ -62,6 +63,7 @@ def stadyumlar_indir(veri_klasoru, ham, yenile=False, yaz=print):
     for anahtar, ad, *_ in LIGLER:
         lid = FOTMOB_LIG_ID[anahtar]
         lg = onbellekli(Path(ham) / f'fm-lig-{lid}.json', fotmob_url('leagues', id=lid), yenile=yenile)
+        sema.kontrol('lig', lg)
         takimlar = {}
         for m in lg['fixtures']['allMatches']:
             for t in (m['home'], m['away']):
@@ -72,6 +74,7 @@ def stadyumlar_indir(veri_klasoru, ham, yenile=False, yaz=print):
         ligler[anahtar] = eslesme
         for tad, tid in takimlar.items():
             t = onbellekli(Path(ham) / f'fm-takim-{tid}.json', fotmob_url('teams', id=tid), yenile=yenile)
+            sema.kontrol('takim_stadyum', t)
             v = (t.get('overview') or {}).get('venue') or {}
             w = v.get('widget') or {}
             kap = next((p[1] for p in v.get('statPairs') or [] if p and p[0] == 'Capacity'), None)
