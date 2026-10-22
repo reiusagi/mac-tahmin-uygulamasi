@@ -68,10 +68,13 @@ def _aday_html(depo, a, tum, anahtar):
     takim_ad = p['t'].split(' / ')[-1]
     tid = depo.takim_kimligi(a['lig'], takim_ad)
     guclu = ' · '.join(f'{e(ad)} {pc}' for ad, pc in guclu_yanlar(a)) or 'belirgin bir üstün yanı yok'
+    # md-guc: modern görünümde güçlü yanlar yüzdelik çubuklu çipler (klasikte gizli; klasik yazıyı gösterir)
+    guc_cip = ''.join(f'<span title="{e(ad)}: mevkidaşlarına göre yüzdelik {pc}"><em>{e(ad)}</em><i style="--p:{pc}"></i>'
+                      f'<b>{pc}</b></span>' for ad, pc in guclu_yanlar(a))
     fp = '' if a['fp'] is None else (f'<span style="color:{"var(--pitch-2)" if a["fp"] > 0 else "var(--bad)"};font-weight:700">'
                                      f'F/P {"+" if a["fp"] > 0 else ""}{round(a["fp"])}</span>')
     return (f'<div class="sc-oyuncu"><div class="sc-ust"><span class="link sc-ad" data-oyuncu="{e(a["lig"])}:{e(a["yil"])}:{e(p["id"])}">'
-            f'{e(p["n"])}</span><span class="sc-endeks" title="Performans endeksi">{round(a["endeks"])}</span></div>'
+            f'{e(p["n"])}</span><span class="sc-endeks" title="Performans endeksi" style="--e:{round(a["endeks"])}">{round(a["endeks"])}</span></div>'
             f'<div class="cap">{takim_logo(tid)}{takim_link(takim_ad, tid) if tid else e(takim_ad)} · {e(mevki_adi(p))}'
             + (f' · {p["yas"]} yaş' if p.get('yas') is not None else '')
             + (f' · {e(turkce(a["uyruk"][1]))}' if a.get('uyruk') and a['uyruk'][1] else '')
@@ -79,7 +82,8 @@ def _aday_html(depo, a, tum, anahtar):
             f'<div class="sc-alt"><span>{para(a["deger"], "–")}</span>{fp}<span class="cap">{p["min"]} dk · {p["g"]} gol · '
             f'{p["a"]} asist</span></div>'
             f'<div class="sc-bar"><i style="width:{round(a["endeks"])}%"></i></div>'
-            f'<div class="cap">Güçlü yanları: {guclu}</div>'
+            f'<div class="cap sc-guclu">Güçlü yanları: {guclu}</div>'
+            + (f'<div class="md-guc">{guc_cip}</div>' if guc_cip else '')
             + (f'<div class="cap">İstikrar: {e(lig_maclari.istikrar_yazisi(a["istikrar"]))}</div>' if a.get('istikrar') else '')
             + f'<div class="sc-zorluk"><span class="sc-z {ZORLUK_SINIF[a["zorluk_etiket"]]}">Transfer: '
             f'{e(a["zorluk_etiket"])} ({a["zorluk"]})</span><span class="cap">{e("; ".join(a["zorluk_neden"]))}</span>'
@@ -187,7 +191,7 @@ class _Scout:
     def __init__(self, G):
         self.G = G
         self.d = {'adaylar': [], 'istek': 0, 'havuz': [], 'havuz_anahtar': None, 'h_istek': 0, 'izin': None, 'ulke': {}}
-        with ui.column().classes('panel'):
+        with ui.column().classes('panel sc-panel'):  # sc-panel, sc-arac: modern görünümün araç çubuğu (klasikte stilsiz)
             ui.html('<h3>Scout</h3>', sanitize=False)
             ui.label('Mevki mevki oyuncu önerileri: her grupta en iyi 5 aday. Süren sezon; ligde eşik kadar oynamış oyuncular. '
                      'Oyuncuya tıklayınca kartı, takıma tıklayınca takım sayfası açılır.').classes('lead')
@@ -205,7 +209,7 @@ class _Scout:
 
     # ---------------------------------------------------------------- arayüz iskeleti
     def _iskelet_sureklu(self):
-        with ui.row().classes('w-full items-end gap-3'):
+        with ui.row().classes('w-full items-end gap-3 sc-arac'):
             self.yas = ui.select(YAS_SECENEK, value='U23', label='Yaş').props('outlined dense options-dense').style('min-width:150px')
             self.kapsam = ui.select({'lig': 'Açık lig', 'tum': 'Bütün ligler'}, value='lig', label='Kapsam').props(
                 'outlined dense options-dense').style('min-width:150px')
@@ -219,7 +223,7 @@ class _Scout:
                              'İndirilenler\\MacTahmin klasörüne CSV olarak')
 
     def _iskelet_ihtiyac(self):
-        with ui.row().classes('w-full items-end gap-3'):
+        with ui.row().classes('w-full items-end gap-3 sc-arac'):
             self.ihtiyac_sec = ui.select({'': 'Seçilmedi'}, value='', label='Takımın ihtiyacına göre öner', with_input=True).props(
                 'outlined dense options-dense').style('min-width:260px')
             self.uyruk = ui.select(UYRUK_SECENEK, value='', label='Uyruk').props('outlined dense options-dense').style(

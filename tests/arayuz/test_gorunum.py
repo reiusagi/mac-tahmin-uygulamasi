@@ -60,7 +60,7 @@ def test_modern_css_yalnizca_stil_modern_altinda():
     """Modern kuralları klasik görünümü değiştirmesin: her seçici body.stil-modern ile başlar (gizli eklenen öğeler hariç)."""
     import re
     govde = re.sub(r'/\*.*?\*/', '', CSS_MODERN, flags=re.S)
-    serbest = {'.md-ust', '.md-lejant'}
+    serbest = {'.md-ust', '.md-lejant', '.md-gol', '.md-guc'}
     for blok in re.findall(r'([^{}]+)\{[^{}]*\}', govde):
         for secici in blok.split(','):
             secici = secici.strip()

@@ -1,15 +1,16 @@
 """Modern görünüm (Görünüm menüsü → Stil: Modern): spor uygulaması havası; koyu öncelikli yüzeyler, tek canlı vurgu rengi,
 büyük skor ve yüzde yazıları, logolu kartlar, renkli olasılık çubukları.
 
-Bütün kurallar body.stil-modern altında: klasik görünüm hiç değişmez. Tek istisna en üstteki iki satır: modern için
-eklenen öğeler (.md-ust: maç tahmini panosunun logolu başlığı, .md-lejant: puan durumunun bölge açıklaması) klasikte gizli.
+Bütün kurallar body.stil-modern altında: klasik görünüm hiç değişmez. Tek istisna en üstteki satır: modern için
+eklenen öğeler (.md-ust: maç tahmini panosunun logolu başlığı, .md-lejant: puan durumunun bölge açıklaması, .md-gol: canlı
+skorda takım satırındaki gol, .md-guc: scout adayının yüzdelik çubuklu güçlü yanları) klasikte gizli.
 Renk paletleri (ortak.PALETLER) modernde vurgu rengini belirler; açık ve koyu temada ayrı tonlar (yazı karşıtlığı ≥ 4,5:1).
 sayfa.py ui.add_css(CSS) ardından eklenir.
 """
 
 CSS_MODERN = r'''
 /* modern için eklenen öğeler klasikte görünmez */
-.md-ust,.md-lejant{display:none}
+.md-ust,.md-lejant,.md-gol,.md-guc{display:none}
 
 /* ---------------------------------------------------------------- renkler: önce palet vurgusu, sonra tema yüzeyleri.
    -k: koyu zemin üstünde (koyu tema ve pano), -a: açık zemin üstünde; -isi: skor ısı haritası; -ana: beyaz yazılı düğme zemini */
@@ -277,15 +278,6 @@ body.stil-modern .rol .ad{font-family:var(--body);font-size:1.02rem}
 body.stil-modern .chip{background:var(--panel);border-color:var(--line);border-radius:999px;padding:2px 9px}
 
 /* ---------------------------------------------------------------- scout ve bu hafta */
-body.stil-modern .sc-izgara{gap:14px}
-body.stil-modern .sc-grup{background:var(--panel-2);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
-body.stil-modern .sc-baslik{font-family:var(--body);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
-body.stil-modern .sc-oyuncu{padding:10px 0}
-body.stil-modern .sc-oyuncu .cap .logo{width:18px;height:18px;vertical-align:-4px;margin-right:5px}
-body.stil-modern .sc-endeks{font-size:1.55rem;color:var(--m-vurgu);font-variant-numeric:tabular-nums}
-body.stil-modern .sc-bar{height:5px;border-radius:999px;background:color-mix(in srgb,var(--soft) 22%,transparent)}
-body.stil-modern .sc-bar i{border-radius:999px}
-body.stil-modern .sc-bar i:not([style*="background"]){background:var(--m-vurgu)}
 body.stil-modern .hm-mac,body.stil-modern .tk-mac,body.stil-modern .tl-mac{padding:9px 8px;border-radius:10px;column-gap:12px;
   transition-property:background-color;transition-duration:150ms}
 body.stil-modern .hm-mac .logo{width:20px;height:20px;vertical-align:-5px}
@@ -293,20 +285,215 @@ body.stil-modern .hm-mac > .cap{font-size:.74rem}
 body.stil-modern .tk-grup{font-family:var(--body);font-size:.8rem;letter-spacing:.07em;text-transform:uppercase;color:var(--soft);
   margin-top:14px;padding-bottom:4px;border-bottom:1px solid var(--line)}
 
+/* ---------------------------------------------------------------- canlı skorlar: FotMob tarzı liste.
+   Gün ve süzgeç çubuğu yapışkan; lig başlığı kartın üst şeridi; maç satırı: solda durum (saat / dakika / MS),
+   sağda alt alta iki takım (logo · ad · gol). Goller .md-gol'de (klasikte gizli; klasik ortadaki skor kutusunu gösterir) */
+body.stil-modern .gun-panel{padding:10px 14px;gap:10px !important;z-index:15;
+  background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+body.stil-modern .gun-panel > .nicegui-row:first-child{gap:6px !important}
+body.stil-modern .gun-dugme{font-family:var(--body);font-size:1rem;font-weight:700;border-radius:999px;padding:2px 14px 2px 10px;
+  background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--line)}
+body.stil-modern .gun-panel .q-btn--round{background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--line)}
+body.stil-modern .gun-panel .q-btn{transition-property:background-color,box-shadow,color;transition-duration:150ms;transition-timing-function:ease-out}
+body.stil-modern .gun-panel .q-btn--round:hover,body.stil-modern .gun-dugme:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m-vurgu) 60%,var(--line))}
+body.stil-modern .gun-panel .q-btn--outline{border-radius:999px;padding:2px 12px}
+body.stil-modern .gun-ozet{font-size:.86rem}
+body.stil-modern .gun-ozet .canli-yazi{background:color-mix(in srgb,var(--bad) 12%,transparent);border-radius:999px;padding:2px 9px}
+body.stil-modern .gun-panel .q-btn.q-btn--rounded{border-radius:999px;font-weight:600;min-height:30px}
+body.stil-modern .lig-panel{padding:0 !important;overflow:hidden}
+body.stil-modern .lig-baslik{padding:11px 16px;margin:0;gap:12px;background:var(--m-ust);border-bottom:1px solid var(--line)}
+body.stil-modern .lig-baslik .disp{font-family:var(--body);font-size:.98rem;font-weight:700;letter-spacing:-.005em}
+body.stil-modern .lig-baslik .lig-logo{width:26px;height:26px}
+body.stil-modern .lig-baslik > .cap{font-size:.78rem;font-weight:600}
+body.stil-modern .canli-rozet{background:color-mix(in srgb,var(--bad) 13%,transparent);border-radius:999px;padding:3px 10px;font-size:.78rem}
+body.stil-modern .cm{max-width:none;margin:0;border-radius:0;padding:10px 16px 10px 12px;border-bottom:1px solid var(--line);
+  grid-template-columns:62px minmax(0,1fr);column-gap:14px;row-gap:3px;position:relative;
+  transition-property:background-color;transition-duration:150ms;transition-timing-function:ease-out}
+body.stil-modern .cm:last-child{border-bottom:0}
+body.stil-modern .cm:hover{background:color-mix(in srgb,var(--m-vurgu) 7%,var(--panel))}
+body.stil-modern .cm > .durum{grid-column:1;grid-row:1 / 3;align-self:center;justify-self:center;font-size:.76rem;font-weight:700;
+  min-width:46px;padding:3px 8px;border-radius:999px;line-height:1.25}
+body.stil-modern .cm > .durum:empty{display:none}
+body.stil-modern .cm > .durum.bitti{background:color-mix(in srgb,var(--soft) 16%,transparent);color:var(--ink);padding:3px 8px}
+body.stil-modern .cm > .durum.canli{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad);gap:5px;
+  font-variant-numeric:tabular-nums}
+body.stil-modern .cm > .durum.iptal{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
+body.stil-modern .cm > .takim{grid-column:2;justify-content:flex-start;text-align:left;gap:10px;font-size:.95rem;min-height:24px}
+body.stil-modern .cm > .takim.ev{grid-row:1} body.stil-modern .cm > .takim.dep{grid-row:2}
+body.stil-modern .cm > .takim .logo{order:-1;width:22px;height:22px;display:inline-block}
+body.stil-modern .cm .md-gol{display:block;order:1;margin-left:auto;min-width:1.6em;text-align:right;font-family:var(--display);
+  font-size:1.15rem;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+body.stil-modern .cm > .skor{display:none}
+body.stil-modern .cm > .skor.saat{display:block;grid-column:1;grid-row:1 / 3;align-self:center;justify-self:center;background:none;border:0;
+  padding:0;min-width:0;font-family:var(--body);font-size:.92rem;font-weight:700;color:var(--ink)}
+body.stil-modern .cm > .durum:not(:empty) ~ .skor.saat{grid-row:2;align-self:start;font-size:.8rem;color:var(--soft)}
+body.stil-modern .cm.baslamadi > .durum:not(:empty){grid-row:1;align-self:end;padding:0;color:var(--soft);font-weight:600}
+body.stil-modern .cm.iptal > .durum{grid-row:1;align-self:end}
+/* açık temada kırmızımsı ve vurgulu haplarda yazı bir ton koyu (karşıtlık ≥ 4,5:1) */
+body.stil-modern:not(.body--dark) .cm > .durum.canli,body.stil-modern:not(.body--dark) .canli-rozet,
+body.stil-modern:not(.body--dark) .gun-ozet .canli-yazi{color:#a8232c}
+body.stil-modern:not(.body--dark) .sc-alt{--bad:#a8232c;--pitch-2:color-mix(in srgb,var(--m-vurgu) 82%,#000)}
+body.stil-modern .cm.canli{background:color-mix(in srgb,var(--bad) 5%,transparent);box-shadow:inset 3px 0 0 var(--bad)}
+body.stil-modern .cm.canli:hover{background:color-mix(in srgb,var(--bad) 9%,var(--panel))}
+body.stil-modern .cm > .alt{grid-column:2;text-align:left;font-size:.74rem;margin-top:2px}
+/* olasılıklar: maç önü küçük haplar; canlı maçta "şu an" yüzdelere (--p) göre bölünmüş üç parçalı çubuk */
+body.stil-modern .cm > .cm-olas{grid-column:2;justify-content:flex-start;gap:6px 10px;margin-top:4px}
+body.stil-modern .cm-olas > .cap:first-child{font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+body.stil-modern .cm .cm-olas .olas{gap:3px}
+body.stil-modern .cm .cm-olas .olas span{font-size:.72rem;padding:2px 8px;border-radius:999px}
+body.stil-modern .cm .cm-olas[data-tahmin] .link{font-weight:600}
+body.stil-modern .cm .cm-olas[data-tahmin]:hover .link{text-decoration:underline}
+body.stil-modern .cm .cm-olas:not([data-tahmin]){display:grid;grid-template-columns:auto minmax(0,320px);align-items:center;row-gap:3px}
+body.stil-modern .cm .cm-olas:not([data-tahmin]) .olas{display:flex;gap:2px;width:100%}
+body.stil-modern .cm .cm-olas:not([data-tahmin]) .olas span{flex:var(--p,33) 1 0;min-width:34px;border-radius:3px;padding:1px 4px;
+  text-align:center;line-height:1.35}
+body.stil-modern .cm .cm-olas:not([data-tahmin]) .olas span:first-child{border-radius:999px 3px 3px 999px}
+body.stil-modern .cm .cm-olas:not([data-tahmin]) .olas span:last-child{border-radius:3px 999px 999px 3px}
+body.stil-modern .cm .cm-olas:not([data-tahmin]) > .cap:last-child{grid-column:2;font-size:.72rem}
+body.stil-modern .lig-panel > div + div > .cm{border-top:1px solid var(--line)}
+/* yapışkan gün çubuğu sayfaya göre kalsın (Quasar'ın sekme paneli kendi kaydırma kabı); geniş ekranda maçlar iki sütun */
+@media (min-width:1000px){
+  body.stil-modern .q-tab-panels > .q-panel:has(> .q-tab-panel > .gun-panel){overflow:visible}
+  body.stil-modern .gun-panel{position:sticky;top:47px}
+}
+@media (min-width:1100px){
+  body.stil-modern .lig-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.stil-modern .lig-panel > div:first-child{grid-column:1 / -1}
+  body.stil-modern .lig-panel > div + div > .cm{border-top:0}
+  body.stil-modern .lig-panel > div:nth-child(n+4) > .cm{border-top:1px solid var(--line)}
+  body.stil-modern .lig-panel > div:nth-child(even) > .cm{border-right:1px solid var(--line)}
+  body.stil-modern .lig-panel:has(> div:nth-child(2):last-child){grid-template-columns:minmax(0,1fr)}  /* tek maç: tek sütun */
+  body.stil-modern .lig-panel:has(> div:nth-child(2):last-child) > div > .cm{border-right:0}
+}
+@media (max-width:600px){
+  body.stil-modern .cm{grid-template-columns:52px minmax(0,1fr);column-gap:10px;padding:10px 12px 10px 8px}
+  body.stil-modern .cm > .takim{font-size:.9rem}
+  body.stil-modern .lig-baslik{padding:10px 12px}
+  body.stil-modern .gun-dugme{font-size:.86rem;padding:2px 10px}
+  body.stil-modern .gun-dugme .q-icon{display:none}
+  body.stil-modern .gun-panel > .nicegui-row:first-child{flex-wrap:wrap !important}
+  body.stil-modern .gun-ozet{flex-basis:100%;padding-left:4px}
+  body.stil-modern .sc-arac > .q-field{flex:1 1 140px;min-width:0 !important}
+  body.stil-modern .sc-arac > .cap,body.stil-modern .sc-arac > .q-select--with-input{flex-basis:100% !important}
+  body.stil-modern .sc-arac .q-btn-toggle{width:100%}
+  body.stil-modern .sc-arac .q-btn-toggle .q-btn{flex:1 1 0;padding:0 6px;font-size:.8rem;line-height:1.15}
+}
+
+/* ---------------------------------------------------------------- scout: süzgeçler araç çubuğu, mevki grupları başlık çipli
+   bölümler, adaylar kart (endeks halkası --e; güçlü yanlar yüzdelik çubuklu .md-guc, klasikte gizli) */
+body.stil-modern .sc-arac{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:10px 12px;gap:10px !important}
+body.stil-modern .sc-arac .q-field--outlined .q-field__control{border-radius:10px;background:var(--panel)}
+body.stil-modern .sc-panel .q-btn-toggle{background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--line);border-radius:12px;padding:3px;gap:2px}
+body.stil-modern .sc-arac .q-btn-toggle{background:var(--panel)}
+body.stil-modern .sc-panel .q-btn-toggle .q-btn{border-radius:9px;min-height:34px;padding:0 12px;font-weight:600}
+body.stil-modern .sc-panel .q-btn-toggle .q-btn:not(.bg-primary){color:var(--soft)}
+body.stil-modern .sc-panel .q-btn-toggle .q-btn:not(.bg-primary):hover{color:var(--ink)}
+body.stil-modern .sc-izgara{grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:22px 16px}
+body.stil-modern .sc-grup{background:transparent;border:0;border-radius:0;padding:0;display:flex;flex-direction:column;gap:10px}
+body.stil-modern .sc-baslik{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;margin:0;padding:5px 12px 5px 10px;
+  border-radius:999px;background:color-mix(in srgb,var(--m-vurgu) 14%,transparent);color:var(--ink);font-family:var(--body);
+  font-size:.74rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+body.stil-modern .sc-baslik::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--m-vurgu)}
+body.stil-modern .sc-oyuncu{--m-kart:var(--panel-2);background:var(--m-kart);border:1px solid var(--line);border-radius:14px;
+  padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:3px;align-content:start;
+  transition-property:border-color;transition-duration:150ms;transition-timing-function:ease-out}
+body.stil-modern .sc-oyuncu:hover{border-color:color-mix(in srgb,var(--m-vurgu) 45%,var(--line))}
+body.stil-modern .sc-oyuncu > *{grid-column:1 / -1;min-width:0}
+body.stil-modern .sc-ust{display:contents}
+body.stil-modern .sc-ad{grid-column:1;grid-row:1;align-self:end;font-size:1.04rem;font-weight:700;letter-spacing:-.005em;
+  color:var(--ink);text-wrap:balance}
+body.stil-modern .sc-ad:hover{color:var(--m-vurgu)}
+body.stil-modern .sc-ust + .cap{grid-column:1;grid-row:2}
+body.stil-modern .sc-oyuncu > .sc-alt{grid-column:1;grid-row:3;gap:4px 8px;align-items:center;font-size:.86rem;margin-top:3px}
+body.stil-modern .sc-alt > span:first-child{font-weight:700;font-variant-numeric:tabular-nums}
+body.stil-modern .sc-alt > span[style]{padding:1px 8px;border-radius:999px;font-size:.76rem;font-variant-numeric:tabular-nums;
+  background:color-mix(in srgb,currentColor 13%,transparent)}
+body.stil-modern .sc-alt > .cap{font-size:.76rem}
+body.stil-modern .sc-endeks{grid-column:2;grid-row:1 / 4;align-self:center;width:58px;height:58px;border-radius:50%;display:grid;
+  place-items:center;font-size:1.3rem;line-height:1;color:var(--ink);
+  background:radial-gradient(closest-side,var(--m-kart) 78%,transparent 80% 100%),
+             conic-gradient(var(--m-vurgu) calc(var(--e,0) * 1%),color-mix(in srgb,var(--soft) 22%,var(--m-kart)) 0)}
+body.stil-modern .sc-oyuncu > .sc-bar{display:none}
+body.stil-modern .sc-oyuncu > .cap{font-size:.78rem}
+body.stil-modern .sc-oyuncu:has(> .md-guc) > .sc-guclu{display:none}
+body.stil-modern .md-guc{display:flex;flex-direction:column;gap:4px;margin:8px 0 2px}
+body.stil-modern .md-guc::before{content:"Güçlü yanları";font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--soft)}
+body.stil-modern .md-guc span{display:grid;grid-template-columns:minmax(0,1fr) minmax(60px,96px) 24px;align-items:center;gap:8px;
+  font-size:.78rem}
+body.stil-modern .md-guc em{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.stil-modern .md-guc i{height:6px;border-radius:999px;
+  background:linear-gradient(var(--m-vurgu),var(--m-vurgu)) 0 0 / calc(var(--p,0) * 1%) 100% no-repeat,
+             color-mix(in srgb,var(--soft) 22%,transparent)}
+body.stil-modern .md-guc b{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+body.stil-modern .sc-zorluk{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);gap:5px 8px;align-items:center}
+body.stil-modern .sc-zorluk .cap{font-size:.76rem}
+body.stil-modern .sc-z{font-size:.74rem;padding:2px 10px}
+body.stil-modern .sc-izgara > div:not(.sc-grup){display:flex;flex-direction:column}
+body.stil-modern .sc-izgara > div:not(.sc-grup) > .sc-oyuncu{flex:1}
+body.stil-modern .sc-izgara > div > .sc-oyuncu + .cap{margin:6px 4px 0 !important;font-weight:600;color:var(--ink)}
+body.stil-modern .ih-kutu{border-radius:16px;padding:16px}
+body.stil-modern .ih-kutu .sc-oyuncu{--m-kart:var(--panel);margin-top:10px}
+body.stil-modern .sc-bar{height:5px;border-radius:999px;background:color-mix(in srgb,var(--soft) 22%,transparent)}
+body.stil-modern .ih-satir .sc-bar{height:6px}
+body.stil-modern .sc-bar i{border-radius:999px}
+body.stil-modern .sc-bar i:not([style*="background"]){background:var(--m-vurgu)}
+
+/* ---------------------------------------------------------------- tahmin oyunu: üstte "sen – model" skorbordu (koyu pano,
+   öndeki taraf .md-onde), yaklaşan maçlar logolu kartlar ve büyük skor kutuları (kayıtlı tahmin .md-kayitli: vurgu kenarı),
+   geçmişte puan rozetleri (.oy-p: 3 kesin skor, 1 doğru sonuç, 0 kaçtı) */
+body.stil-modern .oyun-ozet .tiles{grid-template-columns:repeat(4,minmax(0,1fr)) !important;gap:10px}
+body.stil-modern .oyun-ozet .tile:nth-child(-n+2){grid-row:1;grid-column:span 2;position:relative;padding:20px 12px 16px;
+  background:var(--board);color:var(--board-ink);border:1px solid rgba(255,255,255,.06)}
+body.stil-modern .oyun-ozet .tile:nth-child(1){border-radius:20px 8px 8px 20px;
+  background:radial-gradient(90% 90% at 0% 0%,color-mix(in srgb,var(--b-home) 22%,transparent),transparent 65%),var(--board)}
+body.stil-modern .oyun-ozet .tile:nth-child(2){border-radius:8px 20px 20px 8px;
+  background:radial-gradient(90% 90% at 100% 0%,color-mix(in srgb,var(--b-away) 20%,transparent),transparent 65%),var(--board)}
+body.stil-modern .oyun-ozet .tile:nth-child(2)::before{content:"–";position:absolute;left:-5px;top:50%;transform:translate(-50%,-50%);
+  width:32px;height:32px;border-radius:50%;display:grid;place-items:center;z-index:1;font-weight:700;color:var(--board-ink);
+  background:var(--board);box-shadow:0 0 0 3px var(--panel),inset 0 0 0 1px rgba(255,255,255,.22)}
+body.stil-modern .oyun-ozet .tile:nth-child(-n+2) .num{font-size:3.4rem;line-height:1;color:var(--board-ink)}
+body.stil-modern .oyun-ozet .tile:nth-child(-n+2) small{display:block;margin-top:6px;font-size:.74rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--board-soft)}
+body.stil-modern .oyun-ozet .tile.md-onde{box-shadow:inset 0 0 0 2px var(--m-vurgu-k)}
+body.stil-modern .oyun-ozet .tile.md-onde small::after{content:" · önde";color:var(--lamp)}
+body.stil-modern .oyun-ozet .tile:nth-child(n+3){grid-row:2;grid-column:span 2;display:flex;align-items:baseline;justify-content:center;
+  gap:8px;padding:10px 12px;background:var(--panel-2);border:1px solid var(--line)}
+body.stil-modern .oyun-ozet .tile:nth-child(n+3) .num{font-size:1.35rem;display:inline}
+body.stil-modern .oyun-ozet .tile:nth-child(n+3) small{font-size:.8rem}
+body.stil-modern .oyun-ozet > .lead{text-align:center;margin-top:10px !important}
+body.stil-modern .oyun-liste{gap:8px !important}
+body.stil-modern .oyun-satir{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:10px 14px;gap:10px !important;
+  transition-property:border-color,box-shadow;transition-duration:150ms;transition-timing-function:ease-out}
+body.stil-modern .oyun-satir:hover{border-color:color-mix(in srgb,var(--m-vurgu) 45%,var(--line))}
+body.stil-modern .oyun-satir.md-kayitli{border-color:color-mix(in srgb,var(--m-vurgu) 55%,var(--line));box-shadow:inset 3px 0 0 var(--m-vurgu)}
+body.stil-modern .oyun-zaman{font-weight:600;font-size:.8rem;font-variant-numeric:tabular-nums}
+body.stil-modern .oyun-takim{display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:.98rem;vertical-align:middle}
+body.stil-modern .oyun-takim .logo{width:26px;height:26px}
+body.stil-modern .oyun-satir .q-field{width:54px !important}
+body.stil-modern .oyun-satir .q-field__control{border-radius:12px;background:var(--panel);min-height:46px;height:46px}
+body.stil-modern .oyun-satir .q-field__native{text-align:center;font-family:var(--display);font-size:1.45rem;font-weight:700;
+  font-variant-numeric:tabular-nums;padding:0}
+body.stil-modern .oyun-satir .q-field--focused .q-field__control{box-shadow:0 0 0 2px var(--m-vurgu)}
+body.stil-modern .oyun-ayrac{color:var(--soft);font-weight:700}
+body.stil-modern .oyun-satir .q-btn{border-radius:10px;padding:4px 12px;font-weight:600}
+body.stil-modern .oyun-model:not(:empty){width:auto !important;padding:2px 9px;border-radius:999px;font-variant-numeric:tabular-nums;
+  background:color-mix(in srgb,var(--soft) 15%,transparent)}
+body.stil-modern .oy-p{display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 6px;border-radius:999px;color:#fff;
+  font-size:.76rem;font-weight:700}
+body.stil-modern .oy-p.p3{background:var(--m-kazan)} body.stil-modern .oy-p.p1{background:#a16207}
+body.stil-modern .oy-p.p0{background:var(--m-kayip)}
+body.stil-modern table.oyun-gecmis td.hi{font-family:var(--display);font-size:1.05rem;white-space:nowrap}
+@media (max-width:600px){
+  body.stil-modern .oyun-satir{flex-wrap:wrap !important;row-gap:8px !important;padding:10px}
+  body.stil-modern .oyun-zaman{width:100% !important}
+  body.stil-modern .oyun-satir > .nicegui-html{flex:1 1 0 !important;min-width:0}
+  body.stil-modern .oyun-takim{gap:6px;font-size:.88rem}
+  body.stil-modern .oyun-takim .logo{width:20px;height:20px}
+  body.stil-modern .oyun-ozet .tile:nth-child(-n+2) .num{font-size:2.6rem}
+}
+
 /* ---------------------------------------------------------------- canlı, kupalar, milli, maç kartı */
-body.stil-modern .lig-panel{padding:14px 16px 8px}
-body.stil-modern .lig-baslik{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px}
-body.stil-modern .lig-baslik .disp{font-family:var(--body);font-size:1rem;font-weight:700}
-body.stil-modern .cm{border-radius:0;padding:10px 8px;border-bottom:1px solid var(--line)}
-body.stil-modern .cm:hover{background:var(--panel-2)}
-body.stil-modern .cm .skor{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;font-size:1.3rem;min-width:70px}
-body.stil-modern .cm .skor.canli{background:var(--m-kayip);border-color:transparent}
-body.stil-modern .cm .skor.saat{color:var(--m-vurgu);border-color:var(--line)}
-body.stil-modern .cm .durum.bitti{background:var(--panel-2);border-radius:7px}
-body.stil-modern .cm.canli{background:color-mix(in srgb,var(--m-kayip) 9%,transparent)}
-body.stil-modern .cm .takim .logo{width:24px;height:24px}
-body.stil-modern .gun-panel{padding:10px 16px}
-body.stil-modern .gun-dugme{font-family:var(--body);font-size:1.05rem}
 body.stil-modern .mm{padding:10px 6px;border-radius:10px}
 body.stil-modern .mm.secilebilir:hover{background:var(--panel-2)}
 body.stil-modern .agac-mac{background:var(--panel-2);border-color:var(--line);border-radius:10px;padding:6px 9px}
@@ -328,9 +515,13 @@ body.stil-modern .belirsiz-kutu{border-radius:10px}
   body.stil-modern .gun-panel .q-btn.text-grey-9{color:var(--ink) !important}
   body.stil-modern .satir .q-btn.link{color:var(--ink) !important;font-weight:600}
   body.stil-modern .satir .q-btn.link:hover{color:var(--m-vurgu) !important}
+  body.stil-modern .oyun-satir.md-kayitli .q-btn.bg-primary{background:color-mix(in srgb,var(--m-vurgu) 18%,var(--panel)) !important;
+    color:var(--ink) !important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--m-vurgu) 55%,transparent)}
 }
 @media (prefers-reduced-motion:reduce){
-  body.stil-modern .fx,body.stil-modern .satir,body.stil-modern .sekmeler .q-tab,body.stil-modern .rol{transition:none}
+  body.stil-modern .fx,body.stil-modern .satir,body.stil-modern .sekmeler .q-tab,body.stil-modern .rol,body.stil-modern .cm,
+  body.stil-modern .sc-oyuncu,body.stil-modern .gun-panel .q-btn,body.stil-modern .oyun-satir{transition:none}
+  body.stil-modern .nabiz{animation:none}
   body.stil-modern .fx:active{transform:none}
 }
 @media (max-width:700px){

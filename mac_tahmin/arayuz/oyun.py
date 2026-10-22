@@ -39,7 +39,7 @@ def sonuc_esle(bekleyen, oynanan, alinmis=()):
     oynanmış maç aday olur; en yakın tarihli seçilir ve bir maç en çok bir tahmine puan verir. Aday yoksa tahmin bekler.
     bekleyen: {anahtar: kayıt}; oynanan: [(tarih, ev, dep, ev golü, dep golü)]; alinmis: başka tahminlere zaten sonuç
     olmuş maçlar {(tarih, ev, dep)}. Döner: {anahtar: (maç tarihi, ev golü, dep golü)}."""
-    adaylar = []
+    adaylar = {}  # anahtar -> [(uzaklık, maç sırası)], en yakın önce
     for k, r in bekleyen.items():
         g0 = _gun(r['tarih'])
         for i, (d, ev, dep, hg, ag) in enumerate(oynanan):
@@ -47,13 +47,25 @@ def sonuc_esle(bekleyen, oynanan, alinmis=()):
                 continue
             fark = _gun(d) - g0
             if -ESLESME_GERI <= fark <= ESLESME_ILERI:
-                adaylar.append((abs(fark), r['tarih'], k, i))
-    out, kullanilan = {}, set()
-    for _, _, k, i in sorted(adaylar):  # en yakın tarih önce; eşitlikte anahtar sırası (belirli sonuç)
-        if k not in out and i not in kullanilan:
-            out[k] = (oynanan[i][0], oynanan[i][3], oynanan[i][4])
-            kullanilan.add(i)
-    return out
+                adaylar.setdefault(k, []).append((abs(fark), i))
+    for liste in adaylar.values():
+        liste.sort()
+    sahibi = {}  # maç sırası -> anahtar
+
+    def yerlestir(k, denenen):
+        """En yakın maçı dener; maç başka tahmine verilmişse o tahmin başka bir adayına kaydırılabiliyorsa yer açar
+        (artıran yol): açgözlü seçim ikinci tahmini yetim bırakmaz, eşleşen tahmin sayısı en çok olur."""
+        for _, i in adaylar[k]:
+            if i not in denenen:
+                denenen.add(i)
+                if i not in sahibi or yerlestir(sahibi[i], denenen):
+                    sahibi[i] = k
+                    return True
+        return False
+    # en yakın adayı olan önce; eşitlikte tarih ve anahtar sırası (belirli sonuç)
+    for k in sorted(adaylar, key=lambda k: (adaylar[k][0][0], bekleyen[k]['tarih'], k)):
+        yerlestir(k, set())
+    return {k: (oynanan[i][0], oynanan[i][3], oynanan[i][4]) for i, k in sahibi.items()}
 
 
 def yetim_kayitlar(kayitlar, yeni, kalan, oynanan):
@@ -153,9 +165,10 @@ def _skor_html(tum, biten):
     bekleyen = len(tum) - len(biten)
     durum = ('Henüz biten tahmin yok.' if not biten else
              'Önde sensin!' if sen > model else 'Model önde.' if model > sen else 'Berabersiniz.')
+    onde = lambda kosul: ' md-onde' if kosul else ''  # noqa: E731  (modern görünümde öndeki taraf vurgulanır)
     return ('<div class="tiles" style="grid-template-columns:repeat(4,1fr)">'
-            f'<div class="tile"><span class="num">{sen}</span><small>Senin puanın</small></div>'
-            f'<div class="tile"><span class="num">{model}</span><small>Modelin puanı</small></div>'
+            f'<div class="tile{onde(sen > model)}"><span class="num">{sen}</span><small>Senin puanın</small></div>'
+            f'<div class="tile{onde(model > sen)}"><span class="num">{model}</span><small>Modelin puanı</small></div>'
             f'<div class="tile"><span class="num">{len(biten)}</span><small>Biten tahmin</small></div>'
             f'<div class="tile"><span class="num">{bekleyen}</span><small>Bekleyen</small></div></div>'
             f'<div class="lead" style="margin-top:6px">{durum} Kesin skor: sen '
@@ -234,14 +247,16 @@ def _gecmis_html(tum):
         sonuc = r.get('sonuc')
         ps, pm = puan(r['sen'], sonuc), puan(r['model'], sonuc)
         renk = lambda x: '' if x is None else ('var(--pitch-2)' if x == KESIN else 'var(--lamp)' if x else 'var(--bad)')  # noqa: E731
+        # oy-p p3 / p1 / p0: modern görünümde puan rozeti (klasikte stilsiz span)
+        rozet = lambda x: '' if x is None else f'<span class="oy-p p{x}">{x}</span>'  # noqa: E731
         sonuc_yazi = f'{sonuc[0]} – {sonuc[1]}' if sonuc else '–'
         satirlar.append(
             f'<tr><td class="cap">{r["tarih"][8:10]}.{r["tarih"][5:7]}</td><td class="cap">{e(LIG_ADI.get(r["lig"], r["lig"]))}</td>'
             f'<td style="text-align:right">{e(r["ev"])}</td><td class="hi" style="text-align:center">{sonuc_yazi}</td>'
             f'<td>{e(r["dep"])}</td><td>{r["sen"][0]} – {r["sen"][1]}</td>'
-            f'<td style="color:{renk(ps)};font-weight:700">{"" if ps is None else ps}</td>'
-            f'<td>{r["model"][0]} – {r["model"][1]}</td><td style="color:{renk(pm)};font-weight:700">{"" if pm is None else pm}</td></tr>')
-    return ('<table class="tb"><thead><tr><th>Tarih</th><th>Lig</th><th style="text-align:right">Ev</th>'
+            f'<td style="color:{renk(ps)};font-weight:700">{rozet(ps)}</td>'
+            f'<td>{r["model"][0]} – {r["model"][1]}</td><td style="color:{renk(pm)};font-weight:700">{rozet(pm)}</td></tr>')
+    return ('<table class="tb oyun-gecmis"><thead><tr><th>Tarih</th><th>Lig</th><th style="text-align:right">Ev</th>'
             '<th>Sonuç</th><th>Deplasman</th><th>Senin</th><th>P</th><th>Model</th><th>P</th></tr></thead><tbody>'
             + ''.join(satirlar) + '</tbody></table>') if satirlar else '<p class="cap">Henüz tahmin girmedin.</p>'
 
@@ -263,11 +278,11 @@ def kur(G):
         ui.label(f'Yaklaşan maçlara skor tahminini gir, modelle yarış. Kesin skor {KESIN} puan, doğru sonuç (ev, beraberlik, '
                  f'deplasman) {SONUC} puan. Tahmini kaydettiğin anda modelin tahmini de kaydedilir; maç başlayınca '
                  'tahmin kilitlenir, bitince puanlanır. Tahminler bütün liglerde birikir.').classes('lead')
-        skor = ui.html('', sanitize=False).classes('w-full')
+        skor = ui.html('', sanitize=False).classes('w-full oyun-ozet')  # oyun-*: modern görünümün kancaları
         hafta = ui.html('', sanitize=False).classes('w-full kaydir')
     with ui.column().classes('panel'):
         baslik = ui.html('<h3>Yaklaşan maçlar</h3>', sanitize=False)
-        liste = ui.column().classes('w-full gap-1')
+        liste = ui.column().classes('w-full gap-1 oyun-liste')
     with ui.column().classes('panel') as ist_panel:
         ui.html('<h3>İstatistiklerim</h3>', sanitize=False)
         ist = ui.html('', sanitize=False).classes('w-full kaydir')
@@ -331,13 +346,13 @@ def kur(G):
                 k = _anahtar(S, m)
                 kayit = tum.get(k)
                 z = yerel(baslama) if baslama else None
-                with ui.row().classes('w-full items-center gap-2 oyun-satir'):
-                    ui.label(f'{kisa_gun(z.date())} {z:%H:%M}' if z else kisa_gun(m.d)).classes('cap').style('width:96px')
+                with ui.row().classes('w-full items-center gap-2 oyun-satir' + (' md-kayitli' if kayit else '')):
+                    ui.label(f'{kisa_gun(z.date())} {z:%H:%M}' if z else kisa_gun(m.d)).classes('cap oyun-zaman').style('width:96px')
                     ui.html(f'<span class="oyun-takim sag">{e(S.T[m.h])}{takim_logo(G.depo.takim_kimligi(S.lig, S.T[m.h]))}</span>',
                             sanitize=False).style('flex:1;text-align:right')
                     ev_k = ui.number(value=(kayit or {}).get('sen', [None])[0], min=0, max=15, step=1, format='%d').props(
                         'outlined dense').style('width:62px')
-                    ui.label('–')
+                    ui.label('–').classes('oyun-ayrac')
                     dep_k = ui.number(value=(kayit or {}).get('sen', [None, None])[1], min=0, max=15, step=1, format='%d').props(
                         'outlined dense').style('width:62px')
                     ui.html(f'<span class="oyun-takim">{takim_logo(G.depo.takim_kimligi(S.lig, S.T[m.a]))}{e(S.T[m.a])}</span>',
@@ -347,7 +362,8 @@ def kur(G):
                         'unelevated dense no-caps color=primary')
                     ui.button('İptal', icon='close', on_click=lambda _, k=k, b=baslama: tahmin_iptal(k, b)).props(
                         'flat dense no-caps color=negative').set_visibility(bool(kayit))
-                    ui.label(f'model: {kayit["model"][0]} – {kayit["model"][1]}' if kayit else '').classes('cap').style('width:80px')
+                    ui.label(f'model: {kayit["model"][0]} – {kayit["model"][1]}' if kayit else '').classes('cap oyun-model').style(
+                        'width:80px')
 
     def istatistik_ciz(biten, haftalar):
         """Lig lig puanlar ve doğru sonuç oranı (sen ve model), en çok verdiğin skorlar, haftalık toplam puan grafiği."""

@@ -309,9 +309,11 @@ def _satir(m, tarihli=False):
     def tlogo(i):
         return takim_logo_url(i)
 
+    # md-gol: modern görünümde skor her takımın satırında sağda (klasikte gizli, skor ortadaki kutuda)
+    ev_gol, dep_gol = (f'<b class="md-gol">{eg}</b>', f'<b class="md-gol">{dg}</b>') if oyn else ('', '')
     return (f'<div class="cm {durum}">{st}'
-            f'<span class="takim ev{" kaz" if ev_kaz else ""}">{e(m["ev"])}{_logo(tlogo(m.get("evId")))}</span>{skor}'
-            f'<span class="takim dep{" kaz" if dep_kaz else ""}">{_logo(tlogo(m.get("depId")))}{e(m["dep"])}</span>'
+            f'<span class="takim ev{" kaz" if ev_kaz else ""}">{e(m["ev"])}{_logo(tlogo(m.get("evId")))}{ev_gol}</span>{skor}'
+            f'<span class="takim dep{" kaz" if dep_kaz else ""}">{_logo(tlogo(m.get("depId")))}{e(m["dep"])}{dep_gol}</span>'
             + _olas_satiri(m.get('_olas'), durum)
             + (f'<span class="alt">{alt}</span>' if alt else '') + '</div>')
 
@@ -319,8 +321,10 @@ def _satir(m, tarihli=False):
 def _olas_kutulari(p):
     """Ev · beraberlik · deplasman olasılık kutuları (favori yeşil, diğer taraf kırmızı)."""
     ev_s, dep_s = ('kaz', 'kay') if p[0] >= p[2] else ('kay', 'kaz')
-    return (f'<span class="olas"><span class="{ev_s}">{yuzde(p[0])}</span><span class="ber">{yuzde(p[1])}</span>'
-            f'<span class="{dep_s}">{yuzde(p[2])}</span></span>')
+    # --p: yüzde; modern görünüm "şu an" olasılıklarını bu oranlarda üç parçalı çubuk olarak çizer (klasikte etkisiz)
+    return (f'<span class="olas"><span class="{ev_s}" style="--p:{round(p[0] * 100)}">{yuzde(p[0])}</span>'
+            f'<span class="ber" style="--p:{round(p[1] * 100)}">{yuzde(p[1])}</span>'
+            f'<span class="{dep_s}" style="--p:{round(p[2] * 100)}">{yuzde(p[2])}</span></span>')
 
 
 def _olas_satiri(o, durum):

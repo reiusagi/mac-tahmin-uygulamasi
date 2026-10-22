@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from nicegui import app, run, ui
 
 from .. import milli
-from ..logo import lig_logo_url
+from ..logo import lig_logo_url, logo_html, takim_logo_url
 from . import mac_tahmini
 from .ortak import e, fmt, kisa_gun, tarih_uzun, tr_anahtar, yerel, yuzde
 
@@ -15,6 +15,7 @@ TUR_ADI = {'Round of 32': 'Son 32', 'Round of 16': 'Son 16', 'Quarter-Finals': '
            'Bronze Final': 'Üçüncülük maçı', 'Final': 'Final'}
 TEMBEL = True  # Elo bütün milli maçlardan hesaplanır: yalnızca sekme açıkken
 VARSAYILAN_TURNUVA = 9806
+BAYRAK_STIL = 'width:20px;height:20px;vertical-align:-5px;'  # tablolarda ve maç satırlarında bayrak boyu
 
 
 def _sonuc(atilan, yenilen):
@@ -34,6 +35,12 @@ def _tablo(basliklar, satirlar, tikla):
                     for icerik, sinif, stil in hucreler:
                         with ui.element('td').classes(sinif).style(stil):
                             ui.html(icerik, sanitize=False)
+
+
+def bayrak_html(tid, stil=BAYRAK_STIL):
+    """Milli takımın bayrağı: FotMob'un milli takım logosu ülke bayrağıdır (kulüp logolarıyla aynı adres). id yoksa ya da
+    geçersizse (takim_logo_url sayıya çevirir) aynı boyda boş yer: kırık resim çıkmaz, adlar hizalı kalır."""
+    return logo_html(takim_logo_url(tid), 'logo bayrak', stil, bos=f'<span class="logo bayrak" style="{stil}"></span>')
 
 
 def _rozet(s):
@@ -184,6 +191,10 @@ class _Milli:
                 ui.html('<h3>Maç tahmini</h3>', sanitize=False)
                 self.ev = ui.select({}, label='Ev sahibi', with_input=True).props('outlined dense options-dense').classes('w-full')
                 self.dep = ui.select({}, label='Deplasman', with_input=True).props('outlined dense options-dense').classes('w-full')
+                self.secim_bayrak = {}
+                for secim in (self.ev, self.dep):  # seçili takımın bayrağı kutunun solunda (turnuva logosu gibi)
+                    with secim.add_slot('prepend'):
+                        self.secim_bayrak[secim] = ui.html('', sanitize=False)
                 self.tarafsiz = ui.checkbox('Tarafsız saha (turnuva finalleri)')
                 self.tahmin_kutu = ui.html('', sanitize=False).classes('w-full')
                 ui.button('Ayrıntılı tahmin', icon='insights', on_click=lambda: self.serbest_ayrinti()).props(
@@ -250,7 +261,12 @@ class _Milli:
         self.kart_gecmis.content = _gecmis_html(g)
 
     # ---------------------------------------------------------------- tahmin
+    def bayraklari_ciz(self):
+        for secim, oge in self.secim_bayrak.items():
+            oge.content = logo_html(takim_logo_url(secim.value), 'logo bayrak', 'width:22px;height:22px;display:block;')
+
     def tahmin_ciz(self, _=None):
+        self.bayraklari_ciz()
         E = self.d['E']
         if not E or self.ev.value is None or self.dep.value is None:
             self.tahmin_kutu.content = ''
@@ -307,9 +323,11 @@ class _Milli:
         satir.on('click', lambda _, m=m, s=secilebilir: (self.mac_sec(m) if s else None, self.ayrintili(m)))
         with satir:
             ui.label(ek).classes('st')
-            ui.label(m['ev']).classes('h link').on('click.stop', lambda _, t=m['evId']: self.takim_ac(t))
+            ui.html(f'{e(m["ev"])}{bayrak_html(m["evId"], "margin-left:7px;")}', sanitize=False).classes('h link').on(
+                'click.stop', lambda _, t=m['evId']: self.takim_ac(t))
             ui.html(orta, sanitize=False).classes('orta')
-            ui.label(m['dep']).classes('a link').on('click.stop', lambda _, t=m['depId']: self.takim_ac(t))
+            ui.html(f'{bayrak_html(m["depId"], "margin-right:7px;")}{e(m["dep"])}', sanitize=False).classes('a link').on(
+                'click.stop', lambda _, t=m['depId']: self.takim_ac(t))
 
     # ---------------------------------------------------------------- turnuva sezonu
     def _gruplari_ciz(self, tid, gruplar):
@@ -320,7 +338,8 @@ class _Milli:
                     ui.label(milli.grup_adi(tid, ad) or ad).classes('disp').style('font-weight:700;font-size:1.1rem')
                     _tablo(['#', 'Takım', 'O', 'G', 'B', 'M', 'Gol', 'P'],
                            [(r['id'], [(str(k + 1), '', f'box-shadow:inset 3px 0 0 {r["renk"] or "transparent"}'),
-                                       (e(r['ad']), 'link', ''), (str(r['O']), '', ''), (str(r['G']), '', ''),
+                                       (bayrak_html(r['id'], BAYRAK_STIL + 'margin-right:8px;') + e(r['ad']), 'link', ''),
+                                       (str(r['O']), '', ''), (str(r['G']), '', ''),
                                        (str(r['B']), '', ''), (str(r['M']), '', ''), (e(r['gol']), '', ''),
                                        (str(r['P']), 'pts', '')])
                             for k, r in enumerate(satirlar)], self.takim_ac)
@@ -396,7 +415,8 @@ class _Milli:
         self.siralama.clear()
         with self.siralama:
             _tablo(['#', 'Takım', 'Elo', 'Maç', 'Son maç'],
-                   [(r['id'], [(str(k), '', ''), (e(r['ad']), 'link', ''), (str(round(r['elo'])), 'hi', ''),
+                   [(r['id'], [(str(k), '', ''), (bayrak_html(r['id'], BAYRAK_STIL + 'margin-right:8px;') + e(r['ad']), 'link', ''),
+                               (str(round(r['elo'])), 'hi', ''),
                                (str(r['mac']), '', ''), (f'{r["son"][8:10]}.{r["son"][5:7]}.{r["son"][:4]}', '', '')])
                     for k, r in enumerate(sira, 1)], self.takim_ac)
         self.sezonlari_doldur()

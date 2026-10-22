@@ -104,6 +104,13 @@ def test_baska_kayda_verilmis_mac_alinmaz():
     assert sonuc_esle(bek, OYNANAN, alinmis={('2026-10-19', 'A', 'B')}) == {}
 
 
+def test_en_cok_tahmini_eslestirir():
+    """En yakın tarihi açgözlü seçmek ikinci tahmini yetim bırakmasın (Codex bulgusu): k1 1 Ocak'a, k2 4 Ocak'a."""
+    bek = {'k1': _kayit('2026-01-03'), 'k2': _kayit('2026-01-06')}
+    oy = [('2026-01-04', 'A', 'B', 1, 0), ('2026-01-01', 'A', 'B', 2, 0)]
+    assert sonuc_esle(bek, oy) == {'k1': ('2026-01-01', 2, 0), 'k2': ('2026-01-04', 1, 0)}
+
+
 def test_bos_girdiler():
     assert sonuc_esle({}, OYNANAN) == {}
     assert sonuc_esle({'k': _kayit('2026-10-19')}, []) == {}
