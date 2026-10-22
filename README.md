@@ -70,9 +70,11 @@ Python kurulu olmayan bir bilgisayarda da çalışır (`dist\MacTahmin` klasör�
 - Veriler `%LOCALAPPDATA%\MacTahmin` klasöründe tutulur ve yukarıdaki gibi kendini günceller. Hatalar `uygulama.log`'a yazılır.
 - Kod değiştiğinde yeniden paketlemek için: `python masaustu_paketle.py` (önce açık uygulamayı kapat).
 - Paketlemeden denemek için: `python -m mac_tahmin.masaustu`
-- GitHub'da paket: `v` ile başlayan bir sürüm etiketi (ör. `git tag v1.0` ve `git push origin v1.0`) ya da Actions →
-  "Testler ve paket" → Run workflow, `.exe` klasörünü indirilebilir dosya olarak üretir. Her push'ta testler de orada
-  çalışır (`.github/workflows/test.yml`).
+- GitHub'da sürüm: `v` ile başlayan bir etiket (ör. `git tag v1.1` ve `git push origin v1.1`) `.exe` klasörünü üretir,
+  zip'leyip deponun **Releases** sayfasına kalıcı olarak ekler (indirmek için zip'i aç, `MacTahmin\MacTahmin.exe`'yi
+  çalıştır). Paket o anki kodun kopyasıdır, kendi kendine güncellenmez; veriler ise uygulama açıkken kendini günceller.
+  Yeni kod için yeni etiket ver. Actions → "Testler ve paket" → Run workflow elle 30 gün saklanan bir paket üretir.
+  Her push'ta testler de orada çalışır (`.github/workflows/test.yml`).
 
 ## Komut satırı
 

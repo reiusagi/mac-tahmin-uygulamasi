@@ -1,5 +1,6 @@
-# Her push ve pull request'te testler çalışır; "v" ile başlayan etikette (ör. v1.2) ya da elle
-# (Actions → "Testler ve paket" → Run workflow) masaüstü paketi de üretilip indirilebilir dosya olarak eklenir.
+# Her push ve pull request'te testler çalışır. "v" ile başlayan etikette (ör. v1.2) masaüstü paketi üretilir, zip'lenip
+# GitHub Releases'e kalıcı olarak eklenir; elle çalıştırmada (Actions → "Testler ve paket" → Run workflow) 30 gün
+# saklanan indirilebilir dosya olur.
 name: Testler ve paket
 
 on:
@@ -26,6 +27,8 @@ jobs:
     needs: test
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
+    permissions:
+      contents: write  # etiket sürümünde Releases'e dosya eklemek için
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -35,7 +38,17 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: python -m pip install -r requirements.txt
       - run: python masaustu_paketle.py
+      - name: Sürümü yayımla (Releases)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = "MacTahmin-${{ github.ref_name }}-windows.zip"
+          7z a -tzip $zip ./dist/MacTahmin | Out-Null
+          gh release create "${{ github.ref_name }}" $zip --title "Maç Tahmin Laboratuvarı ${{ github.ref_name }}" --generate-notes
       - uses: actions/upload-artifact@v7
+        if: github.event_name == 'workflow_dispatch'
         with:
           name: MacTahmin-windows
           path: dist/MacTahmin/
