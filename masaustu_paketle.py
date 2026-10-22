@@ -116,6 +116,7 @@ def baslangic_onbellegi():
                 g = f.relative_to(k)
                 if g not in secilen or f.stat().st_mtime > secilen[g].stat().st_mtime:
                     secilen[g] = f
+    hedef.mkdir(parents=True, exist_ok=True)  # ham/ yoksa (GitHub Actions) önbellek boş kalır, sürüm dosyası yine yazılır
     for g, f in secilen.items():
         (hedef / g).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(f, hedef / g)
