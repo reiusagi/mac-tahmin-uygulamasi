@@ -50,6 +50,12 @@ class Gorunum:
         self.ayrintili_tahmin = lambda bilgi: None  # kupa / milli maçın ayrıntılı tahmini (arayuz/mac_tahmini.py)
         self.avrupa_mac_ac = lambda kupa_id, mac_id: None  # canlı skordan kupa maçının ayrıntılı tahmini (avrupa_sekme)
         self.milli_mac_ac = lambda turnuva_id, mac_id: None  # canlı skordan milli maçın ayrıntılı tahmini (milli_sekme)
+        self.kart_kapatanlar = []  # kulüp ve oyuncu kartının kapatıcıları (kartlar kendini kurarken ekler)
+
+    def kartlari_kapat(self):
+        """Açık kulüp / oyuncu kartlarını kapatır: bir sekmeye geçilirken (ör. lig maçının tahmini) önde kalmasınlar."""
+        for kapat in self.kart_kapatanlar:
+            kapat()
 
     def dinle(self, olay, fn):
         self._dinleyiciler.setdefault(olay, []).append(fn)

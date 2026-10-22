@@ -84,8 +84,19 @@ def tahmine_git(G, m):
     if not bulunan:
         ui.notify('Bu maçın takımları uygulamanın liglerinde bulunamadı.')
         return False
+    G.kartlari_kapat()  # lig tahmini bir sekme: açık kulüp / oyuncu kartı önünde kalmasın
     G.tahmin_ac(*bulunan)
     return True
+
+
+def fikstur_maci(f):
+    """Takım fikstüründeki maç (takim._mac) → maç kartının beklediği sözlük; lig anahtarı ve takım kimlikleri dahil
+    (kupa maçı lig maçı sanılmasın, tahmin düğmesi doğru yere gitsin)."""
+    from ..canli import lig_anahtari
+    return {'id': f['id'], 'baslik': f['turnuva'], 'grup': '', 'baslangic': f['zaman'],
+            'durum': 'canli' if f['canli'] else 'bitti' if f['bitti'] else 'baslamadi',
+            'lig': lig_anahtari(f.get('turnuva_id')) or '', 'ev': f.get('ev'), 'dep': f.get('dep'),
+            'evId': f.get('evId'), 'depId': f.get('depId')}
 
 
 def _lig_takimlari(ligler, lig, ev_id, dep_id):

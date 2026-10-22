@@ -443,4 +443,6 @@ class _Kart:
 
 
 def kur(G):
-    return _Kart(G).ac
+    kart = _Kart(G)
+    G.kart_kapatanlar.append(kart.dlg.close)  # bir sekmeye (ör. lig maçının tahmini) geçilirken kapanır
+    return kart.ac

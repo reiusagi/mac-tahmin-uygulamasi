@@ -67,6 +67,44 @@ def test_farkli_liglerin_takimlari_bulunamaz(monkeypatch):
     gorunum.tahmin_ac.assert_not_called()
 
 
+def test_lig_anahtari_fotmob_kimliginden():
+    from mac_tahmin.canli import lig_anahtari
+    from mac_tahmin.sezon import FOTMOB_ID
+    assert lig_anahtari(FOTMOB_ID['Ligue_1']) == 'Ligue_1'
+    assert lig_anahtari(42) == 'avrupa-42'  # Şampiyonlar Ligi
+    assert lig_anahtari(None) is None and lig_anahtari(999999) is None
+
+
+def test_kulup_kartindaki_sampiyonlar_ligi_maci_kupa_analizini_acar():
+    """PSG – Barcelona (oynanmış Şampiyonlar Ligi maçı) kulüp kartından: lig maçı sanılıp 'bulunamadı' denmesin."""
+    from mac_tahmin.arayuz.ortak import fikstur_maci
+    f = {'id': 77, 'zaman': '2026-10-21T19:00:00Z', 'turnuva_id': 42, 'turnuva': 'Şampiyonlar Ligi', 'ev': 'PSG',
+         'dep': 'Barcelona', 'evId': 9847, 'depId': 8634, 'skor': (4, 2), 'bitti': True, 'canli': False, 'iptal': False}
+    m = fikstur_maci(f)
+    assert (m['lig'], m['evId'], m['depId'], m['durum'], m['baslik']) == ('avrupa-42', 9847, 8634, 'bitti', 'Şampiyonlar Ligi')
+    gorunum = _gorunum_ligler()
+    assert tahmine_git(gorunum, m) is True
+    gorunum.avrupa_mac_ac.assert_called_once_with(42, 77)
+    gorunum.kartlari_kapat.assert_not_called()  # kupa analizi pencere: kulüp kartı arkada kalır, kapanınca ona dönülür
+
+
+def test_lig_tahminine_gecerken_acik_kartlar_kapanir():
+    """Kulüp kartından lig maçının tahminine geçince Maç tahmini sekmesi kulüp kartının arkasında kalmasın."""
+    gorunum = _gorunum_ligler()
+    assert tahmine_git(gorunum, {'durum': 'baslamadi', 'lig': 'Ligue_1', 'evId': 9847, 'depId': 9748}) is True
+    gorunum.kartlari_kapat.assert_called_once_with()
+    gorunum.tahmin_ac.assert_called_once_with('Ligue_1', 'Paris Saint Germain', 'Lyon')
+
+
+def test_gorunum_kartlari_kapat():
+    from mac_tahmin.arayuz.sayfa import Gorunum
+    G = Gorunum(depo=None)
+    kapanan = []
+    G.kart_kapatanlar += [lambda: kapanan.append('kulüp'), lambda: kapanan.append('oyuncu')]
+    G.kartlari_kapat()
+    assert kapanan == ['kulüp', 'oyuncu']
+
+
 def test_mac_kimlikleri_karttaki_ayrintidan_tamamlanir():
     from mac_tahmin.arayuz.ortak import mac_kimlikleri_tamamla
     mac = {'id': 1, 'durum': 'baslamadi'}

@@ -8,7 +8,7 @@ from .. import takim
 from ..bicim import para
 from ..logo import logo_html, takim_logo_url
 from . import bildirim, takip
-from .ortak import FORM, e, hata_metni, kisa_gun, takim_link, takim_logo, takim_tiklama, yerel
+from .ortak import FORM, e, fikstur_maci, hata_metni, kisa_gun, takim_link, takim_logo, takim_tiklama, yerel
 
 logger = logging.getLogger(__name__)
 ID, AD = 'takimlarim', 'Takımlarım'
@@ -239,8 +239,7 @@ def kur(G):
     def mac_ac(v, mac_id):
         m = next((x for x in v['maclar'] if str(x['id']) == str(mac_id)), None)
         if m:
-            G.mac_ac({'id': m['id'], 'baslik': m['turnuva'], 'grup': '', 'baslangic': m['zaman'],
-                      'durum': 'canli' if m['canli'] else 'bitti' if m['bitti'] else 'baslamadi'})
+            G.mac_ac(fikstur_maci(m))
 
     def ciz():
         favs = bildirim.favoriler()

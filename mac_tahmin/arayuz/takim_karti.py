@@ -10,7 +10,7 @@ from .. import avrupa, lig_maclari, takim
 from ..logo import logo_html, takim_logo_url
 from . import bildirim
 from ..sezon import SANS_ESIK, SON_SEZON, hak_edilen_puan
-from .ortak import FORM, e, fmt, hata_metni, kisa_gun, yerel, yuzde
+from .ortak import FORM, e, fikstur_maci, fmt, hata_metni, kisa_gun, yerel, yuzde
 
 logger = logging.getLogger(__name__)
 
@@ -392,8 +392,7 @@ class _TakimKarti:
     def mac_tiklandi(self, ev):
         m = next((x for x in (self.d['veri'] or {}).get('maclar', []) if str(x['id']) == str(ev.args)), None)
         if m:
-            self.G.mac_ac({'id': m['id'], 'baslik': m['turnuva'], 'grup': '', 'baslangic': m['zaman'],
-                           'durum': 'canli' if m['canli'] else 'bitti' if m['bitti'] else 'baslamadi'})
+            self.G.mac_ac(fikstur_maci(m))
 
     def oyuncu_tiklandi(self, ev):
         """Kadrodaki, sakatlar listesindeki ya da sahadaki oyuncu: uygulamadaki kaydının oyuncu kartı."""
@@ -605,4 +604,5 @@ class _TakimKarti:
 def kur(G):
     kart = _TakimKarti(G)
     G.takim_ac = lambda anahtar: G.arka_plan(kart.ac(anahtar))
+    G.kart_kapatanlar.append(kart.dlg.close)  # bir sekmeye (ör. lig maçının tahmini) geçilirken kapanır
     return kart.ac

@@ -25,6 +25,12 @@ SIRA = {**{k: -10 + i for i, (k, _) in enumerate(AVRUPA.values())}, **{l[0]: i f
         **{k: 50 + i for i, (k, _) in enumerate(YEREL.values())}, **{k: 100 + i for i, (k, _) in enumerate(MILLI.values())}}
 
 
+def lig_anahtari(lid):
+    """FotMob turnuva kimliği → canlı skordaki lig anahtarı ('Super_Lig', 'avrupa-42', 'kupa-…', 'milli-…'); uygulamanın
+    izlemediği turnuvada None. Takım fikstüründen açılan maç kartının tahmine gidebilmesi için."""
+    return FOTMOB_LIGLER.get(lid) or (AVRUPA.get(lid) or YEREL.get(lid) or MILLI.get(lid) or (None,))[0]
+
+
 def _grup(tid, ad):
     """FotMob'un 'UEFA Nations League A Grp. 2' gibi adından grup: 'A Ligi · 2. Grup' (yoksa '')."""
     if 'Grp.' not in ad:
