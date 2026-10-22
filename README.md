@@ -39,7 +39,28 @@ Uygulama açık kaldığı sürece veriler kendini günceller (`mac_tahmin/gunce
   "Şimdi güncelle" düğmesi beklemeden yeniler.
 - stadyumlar: ayda bir
 
+FotMob ya da Understat verinin biçimini değiştirirse (alan adı değişir, alan kaybolur) alt bilgide sarı bir uyarı
+çıkar ("veri biçimi değişmiş olabilir"); ayrıntı `uygulama.log`'a yazılır (`mac_tahmin/sema.py`).
+
 Son seçilen lig, sezon ve sekme hatırlanır.
+
+## Görünüm
+
+Başlıktaki palet düğmesinden:
+
+- **Stil:** Modern (varsayılan; koyu skorbord kartları, renkli olasılık çubukları, ısı haritası skor tablosu, bölge
+  renkli puan durumu, FotMob tarzı canlı skorlar) ya da Klasik. Değişiklik sayfa yenilenmeden uygulanır, seçim hatırlanır.
+- **Tema:** bilgisayara göre, açık ya da koyu.
+- **Renkler:** saha yeşili, gece mavisi, bordo, grafit (Modern'de vurgu rengini de belirler).
+
+## Takımlarım, bildirimler ve tahmin oyunu
+
+- **Takımlarım:** bir takımın sayfasında "Takımlarıma ekle" ile takip edilir; maçlarında Windows bildirimi gelir. Takıma
+  ayrı bildirim sesi seçilebilir, kendi MP3/WAV sesini de ekleyebilirsin (en çok 5 MB, 20 dosya).
+- **Tahmin hatırlatması:** takip ettiğin takımın maçına tahmin girmediysen başlamadan önce bir kez hatırlatılır
+  (varsayılan 3 saat; Takımlarım'da süresi ayarlanır, 0 kapatır).
+- **Tahmin oyunu:** yaklaşan maçlara skor tahmini girip modelle yarışırsın; kesin skor 3, doğru sonuç 1 puan. Maç
+  başlayınca tahmin kilitlenir, bitince maçın tarihine göre eşlenip puanlanır (ertelenen maç çift sayılmaz).
 
 ## Masaüstü uygulaması
 
@@ -49,6 +70,9 @@ Python kurulu olmayan bir bilgisayarda da çalışır (`dist\MacTahmin` klasör�
 - Veriler `%LOCALAPPDATA%\MacTahmin` klasöründe tutulur ve yukarıdaki gibi kendini günceller. Hatalar `uygulama.log`'a yazılır.
 - Kod değiştiğinde yeniden paketlemek için: `python masaustu_paketle.py` (önce açık uygulamayı kapat).
 - Paketlemeden denemek için: `python -m mac_tahmin.masaustu`
+- GitHub'da paket: `v` ile başlayan bir sürüm etiketi (ör. `git tag v1.0` ve `git push origin v1.0`) ya da Actions →
+  "Testler ve paket" → Run workflow, `.exe` klasörünü indirilebilir dosya olarak üretir. Her push'ta testler de orada
+  çalışır (`.github/workflows/test.yml`).
 
 ## Komut satırı
 
@@ -80,9 +104,13 @@ U23, 23-29 ya da 30+ olabilir. Yaş, süren sezonda bugünkü yaştır; geçmiş
   América, Afrika ve Asya kupaları, Gold Cup, hazırlık maçları). Üstteki küçük takvimle önceki/sonraki güne ya da
   takvimden herhangi bir güne geçilir.
 - **Milli takımlar** sekmesi: turnuva ve sezon seçimi, grup tabloları, maçlar (oynanmamışlarda olasılıklar), iki milli
-  takım arasında maç tahmini ve milli takım Elo sıralaması.
+  takım arasında maç tahmini ve milli takım Elo sıralaması; takımlar ülke bayraklarıyla gösterilir.
 - Elo, World Football Elo yöntemiyle 2008'den bu yana bütün resmi milli maçlardan hesaplanır (maçın önemi, gol farkı,
   ev sahibi avantajı). 2022 sonrası maçlarda olasılıklar gerçekleşen sonuçlarla uyumlu çıktı (log-loss 0,89).
+  Turnuvalarda ev sahibi ülke kendi maçlarında avantajlı sayılır (Dünya Kupası, EURO, Copa América, Afrika ve Asya
+  kupaları, Gold Cup; yılbaşını aşan turnuvalar sezonuyla eşlenir).
+- Canlı skordan ya da bir kulübün sayfasından kupa veya milli maçın "Maç tahmini"ne basınca ayrıntılı tahmin penceresi
+  açık sekmenin üstünde açılır (oynanmış maçta skoruyla); lig maçında Maç tahmini sekmesine geçilir.
   FotMob 2026 öncesi hazırlık maçlarını vermediği için kıtalar arası karşılaştırma kabadır.
 - Veri `mac_tahmin/milli.py` ile indirilir, `d/milli.json`'a derlenir; süren turnuvalar 6 saatte bir yenilenir.
 
@@ -104,6 +132,19 @@ U23, 23-29 ya da 30+ olabilir. Yaş, süren sezonda bugünkü yaştır; geçmiş
   Understat liglerinde maç xG'si de özellik olarak kullanılır. `degerlendir` komutu ve "Modeller" sekmesi bunu
   yalnızca bu sezonla eğitilen sürümle aynı test maçlarında karşılaştırır.
 - **Sezon simülasyonu**: kalan maçlar Poisson modeliyle 10.000 kez oynatılır (numpy ile, yarım saniye civarı).
+  Puan eşitliğinde her ligin kendi kuralı uygulanır (`sezon.ESITLIK_KURALI`): ör. Süper Lig, La Liga, Serie A'da ikili
+  maçlar, Ligue 1'de averajdan sonra ikili maçlar, Brasileirão ve Belçika'da galibiyet sayısı, diğerlerinde averaj.
+  Play-off'a bölünen ligler (Belçika, Avusturya, İskoçya, İsviçre, Yunanistan) ve puan yarılama modellenmez.
+- **Piyasalar** (maç tahmini ekranındaki olasılık kartları): önce her skorun olasılığı hesaplanır (skor tablosu), sonra
+  kartın tuttuğu skorlar toplanır. Örneğin 2,5 üst = toplam 3 ve üstü gollü skorlar; karşılıklı gol = iki takımın da
+  gol attığı skorlar. **Handikap ±1,5** gol farkına bakar: "Ev −1,5" ev sahibinin en az 2 farkla kazandığı skorların
+  toplamı, "Ev +1,5" ev sahibinin en çok 1 farkla kaybettiği (ya da berabere kaldığı, kazandığı) skorların toplamı;
+  "Ev −1,5" ile "Dep +1,5" birbirinin tersidir, toplamları %100. Bir olasılığın adil oranı 1 ÷ olasılıktır
+  (ör. %24,5 → 4,08); bahis şirketinin oranı bundan yüksekse model o seçeneği şirketten daha olası görür.
+- **Karne**: her maç yalnızca o haftadan önceki maçlarla kurulan modelle tahmin edilip gerçek sonuçla karşılaştırılır;
+  kalibrasyon tablosu (ör. "%60 dediğimiz maçlar gerçekte %kaç tuttu") ve beklenen kalibrasyon hatası (ECE) da
+  gösterilir. Model ayarları 2025'te seçildiği için 2025 "ayar dönemi", 2026 "doğrulama" olarak ayrılır.
+- **Modeller sekmesi**: eğitim sonuçları veri ve kod değişene kadar önbellekte tutulur (her açılışta yeniden eğitilmez).
 - **Benzer oyuncular**: 90 dakika başına istatistik profilleri standartlaştırılır; benzerlik iki profil arasındaki
   mesafeden hesaplanır, böylece hem oyun tarzı hem üretim düzeyi benzer olmalıdır.
 - **Oyuncu rolleri**: saha oyuncuları 90 dakika başına profillerine göre k-means ile kümelenir (Understat liglerinde
